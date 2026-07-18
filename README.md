@@ -1,15 +1,9 @@
 <!-- Add the wordmark image at docs/branding/weaver-wordmark.png and it will render here. A transparent PNG around 600px wide works well on both light and dark themes. -->
 <p align="center">
-  <img src="docs/branding/weaver-wordmark.png" alt="Weaver" width="420">
+  <img src="docs/branding/weaver-wordmark.png" alt="Weaver" width="600">
 </p>
 
-
-# Weaver (Currently WIP)
-A learning project, for me to gain a better understanding of these technologies.
-
 A DAG-based job scheduler and workflow orchestrator. Weaver lets you define workflows as directed acyclic graphs of tasks, schedule them, execute them across a pool of workers, and recover automatically when things fall. Think of it as small, readable, from-scratch take on the ideas behind Airflow and Temporal.
-
-The name is based on a loom. A workflow is a set of threads (tasks) woven together into something coherent, with each pass depending on the ones before it.
 
 ## Why this exists
 
