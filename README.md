@@ -65,3 +65,213 @@ Because of this, one of the first things Weaver does when a worklow is submitted
 - `Downstream`: the tasks waiting on a given task to finish.
 - `Root task`: a task with no upstream dependencies. These are what the scheduler kicks off first when a run starts.
 - `Topological` sort: any ordering of the tasks that respects all the dependency arrows.
+
+## Features
+ 
+- Define workflows as DAGs in JSON or via the API, with per-task dependencies.
+- Cron-style scheduling plus manual and API-triggered runs.
+- A worker pool that claims tasks using row-level locking (no double execution).
+- Configurable retries, backoff, and per-task timeouts.
+- Automatic recovery of tasks orphaned by dead workers.
+- A React UI that renders the DAG, shows live run status, and exposes logs and run history.
+- A REST API for triggering runs, inspecting state, and managing workflow definitions.
+## Architecture
+ 
+Weaver splits into four moving parts: an API server, a Postgres-backed store that doubles as the task queue, a pool of stateless workers, and a scheduler that turns time into work. The React UI talks only to the API server.
+ 
+```mermaid
+graph TB
+    subgraph Client
+        UI[React UI]
+    end
+ 
+    subgraph Control Plane
+        API[API Server]
+        SCH[Scheduler]
+    end
+ 
+    subgraph State
+        DB[(Postgres:<br/>workflows, runs,<br/>tasks, queue, leases)]
+    end
+ 
+    subgraph Execution
+        W1[Worker 1]
+        W2[Worker 2]
+        W3[Worker N]
+    end
+ 
+    UI -->|REST| API
+    API -->|read / write| DB
+    SCH -->|enqueue due runs| DB
+    W1 -->|claim / heartbeat / complete| DB
+    W2 -->|claim / heartbeat / complete| DB
+    W3 -->|claim / heartbeat / complete| DB
+    SCH -->|reap expired leases| DB
+```
+ 
+### Task lifecycle
+ 
+Every task moves through a small, explicit state machine. Keeping the states minimal is what makes recovery tractable: a reaper only has to look for leases that expired while a task was RUNNING.
+ 
+```mermaid
+stateDiagram-v2
+    [*] --> Pending
+    Pending --> Ready: all upstream tasks succeeded
+    Ready --> Running: worker claims lease
+    Running --> Succeeded: task returns ok
+    Running --> Failed: error or timeout
+    Failed --> Ready: retries remaining, backoff elapsed
+    Failed --> Dead: retries exhausted
+    Running --> Ready: lease expired (worker died)
+    Succeeded --> [*]
+    Dead --> [*]
+```
+ 
+### Execution flow for a single run
+ 
+```mermaid
+sequenceDiagram
+    participant U as User / Scheduler
+    participant A as API Server
+    participant D as Postgres
+    participant W as Worker
+ 
+    U->>A: trigger workflow run
+    A->>D: create run + task rows (Pending)
+    A->>D: mark root tasks Ready
+    loop poll for work
+        W->>D: claim a Ready task (SELECT ... FOR UPDATE SKIP LOCKED)
+        D-->>W: task + lease (Running)
+        loop while executing
+            W->>D: heartbeat (extend lease)
+        end
+        alt success
+            W->>D: mark Succeeded
+            W->>D: mark newly unblocked tasks Ready
+        else failure
+            W->>D: mark Failed (schedule retry or Dead)
+        end
+    end
+```
+ 
+## How the hard parts work
+ 
+### At-least-once, not exactly-once
+ 
+Weaver guarantees a task will run at least once. Exactly-once is not achievable in a distributed system without cooperation from the task itself, so tasks are expected to be idempotent. Each task execution carries a stable run ID and task ID that handlers can use as an idempotency key.
+ 
+### Claiming work without double execution
+ 
+Workers claim tasks with `SELECT ... FOR UPDATE SKIP LOCKED`. This lets many workers poll the same table concurrently while guaranteeing that any given task row is handed to exactly one worker at a time. No external lock service is required.
+ 
+### Dead worker detection
+ 
+When a worker claims a task it also writes a lease with an expiry timestamp, and it renews that lease with periodic heartbeats while the task runs. If the worker crashes, the heartbeats stop and the lease expires. A reaper (run by the scheduler) sweeps for RUNNING tasks whose lease has passed, and returns them to READY so another worker can pick them up. This is how a run resumes after a worker dies mid-task.
+ 
+### Retries and timeouts
+ 
+Each task has a max attempt count and a base backoff. On failure, Weaver computes the next eligible run time using exponential backoff with jitter, and the task will not be claimable again until that time passes. A task that exceeds its timeout is treated as a failure and follows the same path.
+ 
+## Data model
+ 
+The core tables (simplified):
+ 
+- `workflows`: the DAG definition, versioned, stored as task nodes and edges.
+- `runs`: one row per triggered execution of a workflow.
+- `tasks`: one row per task per run, holding state, attempt count, timings, and result.
+- `dependencies`: upstream and downstream edges for tasks within a run.
+- `leases`: worker ID, task ID, and expiry for in-flight work.
+Keeping the queue inside Postgres (rather than a separate broker) means one source of truth, transactional state transitions, and easy recovery. It trades some raw throughput for a much simpler correctness story, which is the right call for a system whose whole point is reliability.
+ 
+## Tech stack
+ 
+The backend is written in Go, split into three binaries (`cmd/api`, `cmd/scheduler`, `cmd/worker`) that share one database. Go is a natural fit here: goroutines make the worker pool and heartbeat loops cheap and easy to reason about, and each binary compiles to a single static file that is trivial to run and deploy.
+ 
+- Language: Go (1.22 or newer).
+- Postgres driver: `pgx` (`github.com/jackc/pgx`), which exposes the row-level locking and `SELECT ... FOR UPDATE SKIP LOCKED` behavior the queue relies on.
+- Migrations: `golang-migrate` for versioned schema changes.
+- HTTP: the standard library `net/http`, optionally with a lightweight router like `chi`. No heavy framework is needed.
+- Cron parsing: `robfig/cron` for interpreting workflow schedules.
+- Store and queue: Postgres, serving as both the durable store and the task queue.
+- Frontend: React (scaffolded with Vite) plus a DAG rendering library such as React Flow for the graph view.
+- Local dev: Docker Compose to bring up Postgres and one or more workers.
+
+Deliberately not used: a separate message broker (Redis, RabbitMQ, Kafka) or an external lock service. Keeping the queue and locks inside Postgres is the whole point, since it gives transactional state transitions and one source of truth. Adding a broker later is a reasonable extension, not a starting requirement.
+
+## Getting started
+ 
+```bash
+# clone and enter the project
+git clone <your-repo-url> weaver
+cd weaver
+ 
+# start postgres, api, scheduler, and workers
+docker compose up --build
+ 
+# run database migrations
+migrate -path ./migrations -database "$DATABASE_URL" up
+ 
+# the UI is served at http://localhost:3000
+# the API is served at http://localhost:8080
+```
+ 
+To scale workers locally, increase the replica count:
+ 
+```bash
+docker compose up --scale worker=4
+```
+
+## Screenshots
+ 
+Screenshots of the UI go here once the frontend is built (Phase 8). Drop image files into a `docs/screenshots/` folder in the repo and update the paths in the table below.
+ 
+| DAG view | Live run status | Run history |
+| :---: | :---: | :---: |
+| ![Workflow DAG view](docs/screenshots/dag-view.png) | ![Live run status](docs/screenshots/run-status.png) | ![Run history](docs/screenshots/run-history.png) |
+| A workflow rendered as a graph | A run in progress, tasks colored by state | The run history and list view |
+ 
+## API sketch
+ 
+```
+POST   /workflows              register or update a workflow definition
+GET    /workflows              list workflows
+POST   /workflows/:id/runs     trigger a run
+GET    /runs/:id               fetch run status and task states
+GET    /runs/:id/tasks/:tid    fetch a single task, including logs
+POST   /runs/:id/cancel        cancel an in-flight run
+```
+ 
+## Example workflow definition
+ 
+```json
+{
+  "name": "daily-report",
+  "schedule": "0 6 * * *",
+  "tasks": [
+    { "id": "extract", "handler": "extractData", "retries": 3, "timeoutSeconds": 120 },
+    { "id": "transform", "handler": "transformData", "dependsOn": ["extract"] },
+    { "id": "load", "handler": "loadWarehouse", "dependsOn": ["transform"] },
+    { "id": "notify", "handler": "sendEmail", "dependsOn": ["load"], "retries": 5 }
+  ]
+}
+```
+ 
+## Testing the failure paths
+ 
+The parts worth proving out with tests or manual chaos:
+ 
+- Kill a worker while a task is RUNNING and confirm the task is reclaimed after the lease expires.
+- Trigger the same run twice and confirm idempotent handlers do not double-apply effects.
+- Force a task to fail repeatedly and confirm backoff timing, then confirm it lands in DEAD after attempts are exhausted.
+- Start many workers against a small queue and confirm no task is executed by two workers at once.
+
+## Roadmap
+ 
+- Sub-workflows and fan-out / fan-in patterns (dynamic task generation).
+- A metrics endpoint exposing queue depth, run latency, and worker liveness.
+- Pluggable handler runtimes so tasks can run as containers or remote calls.
+- Priority queues and per-workflow concurrency limits.
+
+## License
+
+Released under the [MIT License](LICENSE). © 2026 SarahUniverse
