@@ -33,3 +33,12 @@ Extract --> Validate
 Transform --> Load
 Validate --> Load
 ```
+
+A graph with a cycle is not a DAG, and a scheduler cannot run it. Below, A waits on C, C waits on B, and B waits on A. Nothing can ever start, because every task is blocked by another task that is itself blocked.
+
+```mermaid
+graph LR
+A[Task A] --> B[Task B]
+B --> C[Task C]
+C --> A
+```
