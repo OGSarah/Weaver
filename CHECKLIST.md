@@ -2,11 +2,11 @@
 
 ## Phase 0: Environment and project setup
 
-- [ ] Install Go (`brew install go`) and confirm with `go version`.
+- [x] Install Go (`brew install go`) and confirm with `go version`.
 - [ ] Install a container runtime. OrbStack is recommended on Mac (`brew install orbstack`), or use Docker Desktop.
 - [ ] Install a Postgres client for poking at the database. `psql` comes with `brew install libpq`, or use a GUI like TablePlus or Beekeeper Studio.
 - [ ] Install VS Code and the official Go extension (adds gopls, debugging, and format-on-save).
-- [ ] Create the repo: `go mod init github.com/<you>/weaver`.
+- [x] Create the repo: `go mod init github.com/<you>/weaver`.
 - [ ] Set up the folder layout: `cmd/api`, `cmd/scheduler`, `cmd/worker` for the three binaries, and `internal/` for shared code.
 - [ ] Add a `docker-compose.yml` that starts a Postgres container. Get it running with `docker compose up`.
 - [ ] Commit this as your first checkpoint.
