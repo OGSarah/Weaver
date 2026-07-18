@@ -4,7 +4,7 @@
 
 - [x] Install Go (`brew install go`) and confirm with `go version`.
 - [x] Install a container runtime. Already had Docker Desktop.
-- [ ] Install a Postgres client for poking at the database. I installed TablePlus
+- [x] Install a Postgres client for poking at the database. I installed TablePlus
 - [x] Install VS Code and the official Go extension (adds gopls, debugging, and format-on-save).
 - [x] Create the repo: `go mod init github.com/<you>/weaver`.
 - [ ] Set up the folder layout: `cmd/api`, `cmd/scheduler`, `cmd/worker` for the three binaries, and `internal/` for shared code.
