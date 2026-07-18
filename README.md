@@ -9,7 +9,7 @@ A DAG-based job scheduler and workflow orchestrator. Weaver lets you define work
 Weaver is built to exercise the harder, more interesting problems that show up once you taken execution reliability seriously. They are:
 
 - At-lease-once execution with idempotency, so a retried task does not corrupt state.
-- Dead worker detection via hearrbeats and lease expiry, so a crashed worker does not strand its work.
+- Dead worker detection via heartbeats and lease expiry, so a crashed worker does not strand its work.
 - Dependency resolution across a DAG, so tasks only run once their upsteams succeed.
 - Retries with exponential backoff and timeouts, so transient failures self-heal.
 - A queue that survives restarts, back by Postgres rather than in-memory state.
