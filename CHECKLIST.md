@@ -7,9 +7,9 @@
 - [x] Install a Postgres client for poking at the database. I installed TablePlus
 - [x] Install VS Code and the official Go extension (adds gopls, debugging, and format-on-save).
 - [x] Create the repo: `go mod init github.com/<you>/weaver`.
-- [ ] Set up the folder layout: `cmd/api`, `cmd/scheduler`, `cmd/worker` for the three binaries, and `internal/` for shared code.
-- [ ] Add a `docker-compose.yml` that starts a Postgres container. Get it running with `docker compose up`.
-- [ ] Commit this as your first checkpoint.
+- [x] Set up the folder layout: `cmd/api`, `cmd/scheduler`, `cmd/worker` for the three binaries, and `internal/` for shared code.
+- [x] Add a `docker-compose.yml` that starts a Postgres container. Get it running with `docker compose up`.
+- [x] Commit this as your first checkpoint.
 
 You should understand: why this project ships as three separate binaries (api, scheduler, worker) that all share one database, rather than one big process.
 

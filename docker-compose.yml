@@ -1,1 +1,21 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: weaver-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: weaver
+      POSTGRES_PASSWORD: weaver_dev_password
+      POSTGRES_DB: weaver
+    ports:
+      - "5432:5432"
+    volumes:
+      - weaver_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U weaver -d weaver"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
+volumes:
+  weaver_pgdata:
