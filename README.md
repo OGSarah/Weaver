@@ -1,4 +1,3 @@
-<!-- Add the wordmark image at docs/branding/weaver-wordmark.png and it will render here. A transparent PNG around 600px wide works well on both light and dark themes. -->
 <p align="center">
   <img src="docs/branding/weaver-wordmark.png" alt="Weaver" width="600">
 </p>
