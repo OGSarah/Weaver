@@ -58,6 +58,8 @@ The worker loop is essentially:
 
 Because of this, one of the first things Weaver does when a worklow is submitted is validate that it is actually a DAG, rejecting any definition that contains a cycle before it ever tries to run. Cycle detection is a classic depth-first-search problem.
 
+## Glossary
+
 - `Node` (or vertex): a single task.
 - `Edge`: a dependency arrow between two tasks.
 - `Upstream`: the tasks that must finish before a given task can run ("extract" is upstream of "transform").
