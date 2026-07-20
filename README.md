@@ -179,11 +179,12 @@ Each task has a max attempt count and a base backoff. On failure, Weaver compute
  
 The core tables (simplified):
  
-- `workflows`: the DAG definition, versioned, stored as task nodes and edges.
-- `runs`: one row per triggered execution of a workflow.
-- `tasks`: one row per task per run, holding state, attempt count, timings, and result.
-- `dependencies`: upstream and downstream edges for tasks within a run.
-- `leases`: worker ID, task ID, and expiry for in-flight work.
+- `workflows`: The DAG definition, versioned, stored as task nodes and edges.
+- `runs`: One row per triggered execution of a workflow.
+- `tasks`: One row per task per run, holding state, attempt count, timings, and result.
+- `dependencies`: Upstream and downstream edges for tasks within a run.
+- `leases`: worker ID, task ID, and expiry for in-flight work
+
 Keeping the queue inside Postgres (rather than a separate broker) means one source of truth, transactional state transitions, and easy recovery. It trades some raw throughput for a much simpler correctness story, which is the right call for a system whose whole point is reliability.
  
 ## Tech stack
