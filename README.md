@@ -12,14 +12,14 @@ Weaver is built to exercise the harder, more interesting problems that show up o
 - Dead worker detection via heartbeats and lease expiry, so a crashed worker does not strand its work.
 - Dependency resolution across a DAG, so tasks only run once their upsteams succeed.
 - Retries with exponential backoff and timeouts, so transient failures self-heal.
-- A queue that survives restarts, back by Postgres rather than in-memory state.
+- A queue that survives restarts, backed by Postgres rather than in-memory state.
 
 ## Understanding DAGS
 
 DAG stands for Directed Acyclic Graph. It is the concept the entire project is built around, so it is worth taking the time to understand before doing anything else. Break the name into its three parts:
 
 - Graph: A set of nodes connected by edges. In Weaver, each node is a task ("extract data", "send email") and each edge is a dependency between tasks.
-- Directed: The edges have a direction. "Transform" depends on "extract", and that arrow only points one way. Extract has to finish before transform can start, never     the reverse.
+- Directed: The edges have a direction. "Transform" depends on "extract", and that arrow only points one way. Extract has to finish before transform can start, never the reverse.
 - Acyclic: There are no cycles. You can never follow the arrows and end up back where you started. This is a crucial property.
 
 A valid DAG has arrows that only ever flow forward.
