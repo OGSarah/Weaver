@@ -45,7 +45,7 @@ C --> A
 
 The acyclic property is what makes the whole system computable. Because there are no cycles, two things are always true:
 
-1. You an always find a valid order to run the tasks. This ordering is called a `topological sort`, and there can more than one valid ordering. This is exactly what lets independent tasks (like "transform" and "validate" above) run in parallel.
+1. You an always find a valid order to run the tasks. This ordering is called a `topological sort`, and there can be more than one valid ordering. This is exactly what lets independent tasks (like "transform" and "validate" above) run in parallel.
 2. You can always answer "what is ready to run right now?" by checking whether every task pointing into a given task has already succeeded.
 
 The worker loop is essentially:
@@ -58,16 +58,16 @@ Because of this, one of the first things Weaver does when a worklow is submitted
 
 ## Glossary
 
-- `Node` (or vertex): a single task.
-- `Edge`: a dependency arrow between two tasks.
-- `Upstream`: the tasks that must finish before a given task can run ("extract" is upstream of "transform").
-- `Downstream`: the tasks waiting on a given task to finish.
-- `Root task`: a task with no upstream dependencies. These are what the scheduler kicks off first when a run starts.
-- `Topological` sort: any ordering of the tasks that respects all the dependency arrows.
+- `Node` (or vertex): A single task.
+- `Edge`: A dependency arrow between two tasks.
+- `Upstream`: The tasks that must finish before a given task can run ("extract" is upstream of "transform").
+- `Downstream`: The tasks waiting on a given task to finish.
+- `Root task`: A task with no upstream dependencies. These are what the scheduler kicks off first when a run starts.
+- `Topological sort`: Any ordering of the tasks that respects all the dependency arrows.
 
 ## Features
  
-- Define workflows as DAGs in JSON or via the API, with per-task dependencies.
+- Defines workflows as DAGs in JSON or via the API, with per-task dependencies.
 - Cron-style scheduling plus manual and API-triggered runs.
 - A worker pool that claims tasks using row-level locking (no double execution).
 - Configurable retries, backoff, and per-task timeouts.
@@ -76,7 +76,11 @@ Because of this, one of the first things Weaver does when a worklow is submitted
 - A REST API for triggering runs, inspecting state, and managing workflow definitions.
 ## Architecture
  
-Weaver splits into four moving parts: an API server, a Postgres-backed store that doubles as the task queue, a pool of stateless workers, and a scheduler that turns time into work. The React UI talks only to the API server.
+Weaver splits into four moving parts: 
+1. An API server
+2. A Postgres-backed store that doubles as the task queue
+3. A pool of stateless workers
+4. A scheduler that turns time into work. The React UI talks only to the API server.
  
 ```mermaid
 graph TB
