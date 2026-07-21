@@ -21,7 +21,7 @@ Start with the pure logic, no database and no network. This is the conceptual he
 
 - [x] Define Go structs for a workflow: a set of tasks and the dependency edges between them.
 - [x] Write a function that, given a workflow, returns the root tasks (those with no upstream dependencies).
-- [ ] Write a function that, given a completed task, returns the tasks it unblocks (its downstream tasks).
+- [x] Write a function that, given a completed task, returns the tasks it unblocks (its downstream tasks).
 - [ ] Write a cycle-detection function using depth-first search. It should return an error if the workflow contains a cycle.
 - [ ] Write a topological sort that returns a valid execution order, or an error if the graph is cyclic.
 - [ ] Write unit tests: a valid diamond DAG, a simple cycle, a self-loop, and a disconnected graph. Confirm cycles are rejected.
