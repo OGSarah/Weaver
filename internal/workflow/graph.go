@@ -46,3 +46,20 @@ func (g *Graph) Roots() []TaskDef {
 
 	return roots
 }
+
+// Unblocks returns the tasks that become eligible once taskID completes its downstream tasks.
+// Takes a task ID and returns full TaskDefs.
+func (g *Graph) Unblocks(taskID string) []TaskDef {
+	// children[taskID] is the IDs this task unblocks. A missing key returns nil,
+	// so a leaf task (unblocks nothing) safely yields no downstream.
+	childIDs := g.children[taskID]
+
+	var downstream []TaskDef
+
+	for _, id := range childIDs {
+		// Map each downsteam ID back to its full TaskDef via byID.
+		downsteam = append(downsteam, g.byID[id])
+	}
+
+	return downsteam
+}
