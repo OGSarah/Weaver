@@ -50,3 +50,48 @@ func (g *Graph) visit(taskID string, state map[string]int) error {
 	state[taskID] = done
 	return nil
 }
+
+// TopoSort returns the tasks in a valid execution order: every task appears
+// after all of its upstream dependencies. Returns an error if the graph is
+// cyclic, since no such ordering exists.
+func (g *Graph) TopoSort() ([]TaskDef, error) {
+	// Count how many upstreams each task is still waiting on.
+	remaining := make(map[string]int, len(g.Def.Tasks))
+	for _, t := range g.Def.Tasks {
+		remaining[t.ID] = len(t.DependsOn)
+	}
+
+	// Seed the queue with the roots: tasks waiting on nothing.
+	var queue []string
+	for _, t := range g.Def.Tasks {
+		if remaining[t.ID] == 0 {
+			queue = append(queue, t.ID)
+		}
+	}
+
+	var order []TaskDef
+	for len(queue) > 0 {
+		// Pop the front of the queue.
+		id := queue[0]
+		queue = queue[1:]
+
+		order = append(order, g.byID[id])
+
+		// This task is done, so each downstream task waits on one fewer.
+		for _, child := range g.children[id] {
+			remaining[child]--
+			// Once nothing blocks it, it is ready to be ordered.
+			if remaining[child] == 0 {
+				queue = append(queue, child)
+			}
+		}
+	}
+
+	// Any task never ordered is stuck waiting on something that never
+	// completed, which only happens inside a cycle.
+	if len(order) != len(g.Def.Tasks) {
+		return nil, fmt.Errorf("cycle detected: only ordered %d of %d tasks", len(order), len(g.Def.Tasks))
+	}
+
+	return order, nil
+}

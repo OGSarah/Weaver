@@ -23,7 +23,7 @@ Start with the pure logic, no database and no network. This is the conceptual he
 - [x] Write a function that, given a workflow, returns the root tasks (those with no upstream dependencies).
 - [x] Write a function that, given a completed task, returns the tasks it unblocks (its downstream tasks).
 - [x] Write a cycle-detection function using depth-first search. It should return an error if the workflow contains a cycle.
-- [ ] Write a topological sort that returns a valid execution order, or an error if the graph is cyclic.
+- [x] Write a topological sort that returns a valid execution order, or an error if the graph is cyclic.
 - [ ] Write unit tests: a valid diamond DAG, a simple cycle, a self-loop, and a disconnected graph. Confirm cycles are rejected.
 
 You should understand: how depth-first search detects a cycle (the "currently visiting" versus "fully visited" node states), and why a topological sort is impossible on a cyclic graph.
