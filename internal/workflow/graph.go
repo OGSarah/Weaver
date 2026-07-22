@@ -1,3 +1,5 @@
+package workflow
+
 // Graph wraps a definition with lookup indexes built once at load time.
 // byID gives O(1) task lookup; children maps a task ID to the IDs it unblocks.
 type Graph struct {
@@ -58,8 +60,8 @@ func (g *Graph) Unblocks(taskID string) []TaskDef {
 
 	for _, id := range childIDs {
 		// Map each downsteam ID back to its full TaskDef via byID.
-		downsteam = append(downsteam, g.byID[id])
+		downstream = append(downstream, g.byID[id])
 	}
 
-	return downsteam
+	return downstream
 }

@@ -1,3 +1,5 @@
+package workflow
+
 import "fmt"
 
 // Node states during the depth-first traversal.
