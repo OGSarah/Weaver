@@ -37,7 +37,7 @@ Now make state durable. Postgres is both your store and your queue, so the schem
 - [x] Choose a migration tool (golang-migrate is a common choice) and wire it in.
 - [x] Create the `workflows` table: id, name, definition (the DAG as JSON), schedule, version.
 - [x] Create the `runs` table: id, workflow_id, status, created_at, started_at, finished_at.
-- [ ] Create the `tasks` table: id, run_id, name, handler, status, attempt count, max attempts, timeout, scheduled_at, timings, result/error.
+- [x] Create the `tasks` table: id, run_id, name, handler, status, attempt count, max attempts, timeout, scheduled_at, timings, result/error.
 - [ ] Create the `dependencies` table (or store edges in the task rows): which tasks block which within a run.
 - [ ] Create the `leases` table: task_id, worker_id, expires_at.
 - [ ] Add indexes you will actually query on: tasks by (status, scheduled_at), leases by expires_at.
