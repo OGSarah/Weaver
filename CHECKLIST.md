@@ -40,8 +40,8 @@ Now make state durable. Postgres is both your store and your queue, so the schem
 - [x] Create the `tasks` table: id, run_id, name, handler, status, attempt count, max attempts, timeout, scheduled_at, timings, result/error.
 - [x] Create the `dependencies` table (or store edges in the task rows): which tasks block which within a run.
 - [x] Create the `leases` table: task_id, worker_id, expires_at.
-- [ ] Add indexes you will actually query on: tasks by (status, scheduled_at), leases by expires_at.
-- [ ] Run the migrations against your Compose Postgres and inspect the tables with your client.
+- [x] Add indexes you will actually query on: tasks by (status, scheduled_at), leases by expires_at.
+- [x] Run the migrations against your Compose Postgres and inspect the tables with your client.
 
 You should understand: why keeping the queue inside Postgres (rather than adding Redis or a broker) gives you transactional state transitions and a single source of truth, and what you trade away for that simplicity.
 
