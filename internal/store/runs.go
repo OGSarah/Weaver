@@ -3,12 +3,88 @@ package store
 import (
 	"context"
 	"fmt"
+	"errors"
+	"time"
 
 	"weaver/internal/workflow"
 	"github.com/jackc/pgx/v5"
 )
 
 const defaultTimeoutSeconds = 300
+
+// TaskState is one task's runtime state within a run.
+type TaskState struct {
+	ID          string
+	Name        string
+	Handler     string
+	Status      string
+	Attempt     int
+	MaxAttempts int
+	ScheduledAt time.Time
+	StartedAt   *time.Time // nil until a worker claims it
+	FinishedAt  *time.Time // nil while still in flight
+	Error       *string    // nil unless the last attempt failed
+}
+
+// RunState is a run plus every task in it.
+type RunState struct {
+	ID         string
+	WorkflowID string
+	Status     string
+	CreatedAt  time.Time
+	StartedAt  *time.Time
+	FinishedAt *time.Time
+	Tasks      []TaskState
+}
+
+// GetRunState returns a run and all of its tasks. Two queries rather than a
+// join, so run fields are not repeated on every task row.
+func (s *Store) GetRunState(ctx context.Context, runID string) (*RunState, error) {
+	var r RunState
+	err := s.pool.QueryRow(ctx,
+		`SELECT id, workflow_id, status, created_at, started_at, finished_at
+		   FROM runs
+		  WHERE id = $1`,
+		runID,
+	).Scan(&r.ID, &r.WorkflowID, &r.Status, &r.CreatedAt, &r.StartedAt, &r.FinishedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("run %s not found", runID)
+		}
+		return nil, fmt.Errorf("query run: %w", err)
+	}
+
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, name, handler, status, attempt, max_attempts,
+		        scheduled_at, started_at, finished_at, error
+		   FROM tasks
+		  WHERE run_id = $1
+		  ORDER BY name`,
+		runID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query tasks: %w", err)
+	}
+	// Must be closed or the connection is not returned to the pool.
+	defer rows.Close()
+
+	for rows.Next() {
+		var t TaskState
+		if err := rows.Scan(
+			&t.ID, &t.Name, &t.Handler, &t.Status, &t.Attempt, &t.MaxAttempts,
+			&t.ScheduledAt, &t.StartedAt, &t.FinishedAt, &t.Error,
+		); err != nil {
+			return nil, fmt.Errorf("scan task: %w", err)
+		}
+		r.Tasks = append(r.Tasks, t)
+	}
+	// Errors during iteration surface here, not from Scan.
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate tasks: %w", err)
+	}
+
+	return &r, nil
+}
 
 // CreateRun materializes a workflow definition into a run: one runs row, one
 // tasks row per task, and one dependencies row per edge. Everything starts
