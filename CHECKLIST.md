@@ -35,7 +35,7 @@ You should understand: how depth-first search detects a cycle (the "currently vi
 Now make state durable. Postgres is both your store and your queue, so the schema is the backbone of the whole system.
 
 - [x] Choose a migration tool (golang-migrate is a common choice) and wire it in.
-- [ ] Create the `workflows` table: id, name, definition (the DAG as JSON), schedule, version.
+- [x] Create the `workflows` table: id, name, definition (the DAG as JSON), schedule, version.
 - [ ] Create the `runs` table: id, workflow_id, status, created_at, started_at, finished_at.
 - [ ] Create the `tasks` table: id, run_id, name, handler, status, attempt count, max attempts, timeout, scheduled_at, timings, result/error.
 - [ ] Create the `dependencies` table (or store edges in the task rows): which tasks block which within a run.
