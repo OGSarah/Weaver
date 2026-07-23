@@ -7,7 +7,7 @@ type TaskDef struct {
 	ID 				string		`json:"id"`
 	Handler 		string		`json:"handler"`
 	DependsOn		[]string	`json:"dependsOn,omitempty"`
-	Retries 		string		`json:"retries,omitempty"`
+	Retries 		int			`json:"retries,omitempty"`
 	TimeoutSeconds	int			`json:"timeoutSeconds,omitempty"` 
 }
 

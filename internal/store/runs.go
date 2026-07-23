@@ -73,6 +73,23 @@ func (s *Store) CreateRun(ctx context.Context, workflowID string, def workflow.W
 		}
 	}
 
+	// Roots are the tasks with no incoming edges. Deriving this from the
+	// dependencies rows we just inserted (rather than from DependsOn) means
+	// readiness can never disagree with the edges actually stored.
+	_, err = tx.Exec(ctx,
+		`UPDATE tasks
+		    SET status = 'ready'
+		  WHERE run_id = $1
+		    AND NOT EXISTS (
+		        SELECT 1 FROM dependencies d
+		         WHERE d.downstream_task_id = tasks.id
+		    )`,
+		runID,
+	)
+	if err != nil {
+		return "", fmt.Errorf("mark roots ready: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return "", fmt.Errorf("commit: %w", err)
 	}
