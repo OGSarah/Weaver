@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"weaver/internal/workflow"
+	"github.com/jackc/pgx/v5"
 )
 
 const defaultTimeoutSeconds = 300
@@ -94,4 +95,28 @@ func (s *Store) CreateRun(ctx context.Context, workflowID string, def workflow.W
 		return "", fmt.Errorf("commit: %w", err)
 	}
 	return runID, nil
+}
+
+// MarkReadyTasks promotes pending tasks whose upstreams have all succeeded.
+// Returns how many were promoted. Call this inside the same transaction that
+// marks a task succeeded, so completion and unblocking are atomic.
+func markReadyTasks(ctx context.Context, tx pgx.Tx, runID string) (int64, error) {
+	tag, err := tx.Exec(ctx,
+		`UPDATE tasks
+		    SET status = 'ready'
+		  WHERE run_id = $1
+		    AND status = 'pending'
+		    AND NOT EXISTS (
+		        SELECT 1
+		          FROM dependencies d
+		          JOIN tasks up ON up.id = d.upstream_task_id
+		         WHERE d.downstream_task_id = tasks.id
+		           AND up.status <> 'succeeded'
+		    )`,
+		runID,
+	)
+	if err != nil {
+		return 0, fmt.Errorf("mark ready tasks: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }

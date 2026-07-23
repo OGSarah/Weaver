@@ -53,7 +53,7 @@ Turn a stored workflow definition into a concrete run with task rows ready to ex
 
 - [x] Write the code that, given a workflow, creates a `runs` row and one `tasks` row per task, all starting in a Pending state.
 - [x] In the same database transaction, mark the root tasks as Ready.
-- [ ] Confirm the state transition rules in code: a task becomes Ready only when all of its upstream tasks have Succeeded.
+- [x] Confirm the state transition rules in code: a task becomes Ready only when all of its upstream tasks have Succeeded.
 - [ ] Write a query that, given a run, returns its full current state (every task and its status).
 - [ ] Test by triggering a run manually and inspecting the rows. The roots should be Ready; everything else Pending.
 
