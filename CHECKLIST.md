@@ -51,7 +51,7 @@ You should understand: why keeping the queue inside Postgres (rather than adding
 
 Turn a stored workflow definition into a concrete run with task rows ready to execute.
 
-- [ ] Write the code that, given a workflow, creates a `runs` row and one `tasks` row per task, all starting in a Pending state.
+- [x] Write the code that, given a workflow, creates a `runs` row and one `tasks` row per task, all starting in a Pending state.
 - [ ] In the same database transaction, mark the root tasks as Ready.
 - [ ] Confirm the state transition rules in code: a task becomes Ready only when all of its upstream tasks have Succeeded.
 - [ ] Write a query that, given a run, returns its full current state (every task and its status).
