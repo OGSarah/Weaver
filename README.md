@@ -3,6 +3,7 @@
 </p>
 
 Currently WIP
+
 TODO: Add CI/CD with GitHub actions
 
 A DAG-based job scheduler and workflow orchestrator. Weaver lets you define workflows as directed acyclic graphs of tasks, schedule them, execute them across a pool of workers, and recover automatically when things fall. Think of it as small, readable, from-scratch take on the ideas behind Airflow and Temporal.
