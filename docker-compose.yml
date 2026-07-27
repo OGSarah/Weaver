@@ -31,9 +31,32 @@ services:
       - "-database=postgres://weaver:weaver_dev_password@postgres:5432/weaver?sslmode=disable"
       - "up"
 
+  # The REST API: the front door for registering workflows, triggering runs, and
+  # inspecting state. Stateless over the database, so it could scale too, but one
+  # replica is plenty for local dev.
+  api:
+    build:
+      context: .
+      args:
+        BINARY: api
+    container_name: weaver-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://weaver:weaver_dev_password@postgres:5432/weaver?sslmode=disable
+      API_ADDR: ":8080"
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
   # The control-plane scheduler. Runs the reaper, which returns tasks stranded by
-  # dead workers to the queue. A single replica is enough (SKIP LOCKED makes more
-  # safe, just redundant), so unlike the worker it keeps a container_name.
+  # dead workers to the queue, and the cron scheduler, which creates runs when a
+  # workflow's schedule comes due. A single replica is enough (SKIP LOCKED and the
+  # per-slot unique index make more safe, just redundant), so unlike the worker it
+  # keeps a container_name.
   scheduler:
     build:
       context: .

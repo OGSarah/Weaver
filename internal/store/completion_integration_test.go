@@ -32,7 +32,7 @@ func newTestStore(t *testing.T) *Store {
 func seedRun(t *testing.T, s *Store, def workflow.WorkflowDef) string {
 	t.Helper()
 	ctx := context.Background()
-	workflowID, err := s.CreateWorkflow(ctx, def)
+	workflowID, _, err := s.CreateWorkflow(ctx, def)
 	if err != nil {
 		t.Fatalf("create workflow: %v", err)
 	}

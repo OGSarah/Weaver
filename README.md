@@ -263,7 +263,33 @@ POST   /runs/:id/cancel        cancel an in-flight run
   ]
 }
 ```
- 
+
+## Trying the API
+
+With the stack up (`docker compose up --build`), the API is on `http://localhost:8080`. A definition is validated on registration: a cyclic DAG, an edge to an unknown task, or an unparseable schedule is rejected with a `400` before anything is stored. Registering a name that already exists stores a new version rather than overwriting it.
+
+```bash
+# Register a workflow (returns its id and version)
+curl -s localhost:8080/workflows -d @workflow.json
+
+# List the current version of every workflow
+curl -s localhost:8080/workflows
+
+# Trigger a run of a workflow by id (returns the new run id)
+curl -s -X POST localhost:8080/workflows/<workflow-id>/runs
+
+# Fetch a run and the state of every task in it
+curl -s localhost:8080/runs/<run-id>
+
+# Fetch a single task, including its result and error
+curl -s localhost:8080/runs/<run-id>/tasks/<task-id>
+
+# Cancel an in-flight run (stops unstarted tasks; running ones finish and are ignored)
+curl -s -X POST localhost:8080/runs/<run-id>/cancel
+```
+
+Workflows that carry a `schedule` are picked up by the scheduler, which creates a run each time a cron slot comes due. If the scheduler was down across several slots, it backfills a run for each missed slot when it returns rather than skipping them. The run for a given slot is created exactly once even if several schedulers are running: the insert is guarded by a unique index on `(workflow_id, scheduled_for)`, so the losers of the race become no-ops rather than duplicate runs.
+
 ## Testing the failure paths
  
 The parts worth proving out with tests or manual chaos:

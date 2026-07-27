@@ -2,9 +2,14 @@ package store
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+// ErrNotFound is returned by lookups when the requested row does not exist, so
+// the API can map it to a 404 rather than leaking a pgx-specific error.
+var ErrNotFound = errors.New("not found")
 
 // Store owns the database connection pool. The pool is safe for concurrent
 // use, so every worker shares one.

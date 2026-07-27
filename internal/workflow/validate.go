@@ -1,6 +1,56 @@
 package workflow
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
+
+// ValidateDef checks a workflow definition is well-formed enough to store and run:
+// it has a name and tasks, every task has an id and handler, ids are unique, every
+// DependsOn names a task that exists, and the dependency graph is acyclic. It is the
+// gate the API runs before persisting a definition, so a bad DAG is rejected with a
+// clear error rather than failing later when a run tries to materialize.
+func ValidateDef(def WorkflowDef) error {
+	if strings.TrimSpace(def.Name) == "" {
+		return fmt.Errorf("workflow name is required")
+	}
+	if len(def.Tasks) == 0 {
+		return fmt.Errorf("workflow %q has no tasks", def.Name)
+	}
+
+	// Every id must be present and unique; handlers must name something to run.
+	seen := make(map[string]struct{}, len(def.Tasks))
+	for _, t := range def.Tasks {
+		if strings.TrimSpace(t.ID) == "" {
+			return fmt.Errorf("a task is missing its id")
+		}
+		if _, dup := seen[t.ID]; dup {
+			return fmt.Errorf("duplicate task id %q", t.ID)
+		}
+		seen[t.ID] = struct{}{}
+		if strings.TrimSpace(t.Handler) == "" {
+			return fmt.Errorf("task %q is missing its handler", t.ID)
+		}
+	}
+
+	// Edges must point at real tasks before the cycle check can mean anything.
+	for _, t := range def.Tasks {
+		for _, up := range t.DependsOn {
+			if _, ok := seen[up]; !ok {
+				return fmt.Errorf("task %q depends on unknown task %q", t.ID, up)
+			}
+			if up == t.ID {
+				return fmt.Errorf("task %q depends on itself", t.ID)
+			}
+		}
+	}
+
+	// The Phase 1 cycle check: a workflow that is not acyclic can never run.
+	if err := NewGraph(def).Validate(); err != nil {
+		return err
+	}
+	return nil
+}
 
 // Node states during the depth-first traversal.
 const (

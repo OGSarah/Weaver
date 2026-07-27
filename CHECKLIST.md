@@ -109,11 +109,11 @@ You should understand: how leases plus heartbeats distinguish "a worker is still
 
 Wrap the engine in the two things a user touches: scheduled triggers and an HTTP API.
 
-- [ ] Add cron-style scheduling: the scheduler parses each workflow's schedule and creates runs when they come due.
-- [ ] Make sure a due schedule creates exactly one run even with multiple scheduler instances (guard it with the database).
-- [ ] Build the REST API: register/update a workflow, list workflows, trigger a run, fetch run status, fetch a single task with its logs, cancel a run.
-- [ ] Validate incoming workflow definitions with your Phase 1 cycle check. Reject cyclic DAGs with a clear error.
-- [ ] Test the endpoints with curl or a REST client.
+- [x] Add cron-style scheduling: the scheduler parses each workflow's schedule and creates runs when they come due.
+- [x] Make sure a due schedule creates exactly one run even with multiple scheduler instances (guard it with the database).
+- [x] Build the REST API: register/update a workflow, list workflows, trigger a run, fetch run status, fetch a single task with its logs, cancel a run.
+- [x] Validate incoming workflow definitions with your Phase 1 cycle check. Reject cyclic DAGs with a clear error.
+- [x] Test the endpoints with curl or a REST client.
 
 You should understand: why "create exactly one run when a schedule is due" is a distributed-systems problem the moment you run more than one scheduler.
 
@@ -138,7 +138,7 @@ You should understand: how the UI stays a thin read layer over the database, and
 
 ## Definition of done
 
-- [ ] A workflow can be defined, validated, scheduled, and triggered.
+- [x] A workflow can be defined, validated, scheduled, and triggered.
 - [ ] Multiple workers execute tasks concurrently with no double execution.
 - [ ] Failed tasks retry with backoff and eventually land in Dead.
 - [ ] Killing a worker mid-task does not lose the work: it resumes.

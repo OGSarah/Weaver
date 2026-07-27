@@ -49,7 +49,7 @@ func (s *Store) GetRunState(ctx context.Context, runID string) (*RunState, error
 	).Scan(&r.ID, &r.WorkflowID, &r.Status, &r.CreatedAt, &r.StartedAt, &r.FinishedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("run %s not found", runID)
+			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("query run: %w", err)
 	}
@@ -89,7 +89,8 @@ func (s *Store) GetRunState(ctx context.Context, runID string) (*RunState, error
 // CreateRun materializes a workflow definition into a run: one runs row, one
 // tasks row per task, and one dependencies row per edge. Everything starts
 // pending. All of it happens in one transaction so a crash midway leaves no
-// half-built run.
+// half-built run. scheduled_for is left NULL, marking this a manual or
+// API-triggered run rather than one the scheduler produced for a cron slot.
 func (s *Store) CreateRun(ctx context.Context, workflowID string, def workflow.WorkflowDef) (string, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -109,6 +110,59 @@ func (s *Store) CreateRun(ctx context.Context, workflowID string, def workflow.W
 		return "", fmt.Errorf("insert run: %w", err)
 	}
 
+	if err := materializeTasks(ctx, tx, runID, def); err != nil {
+		return "", err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", fmt.Errorf("commit: %w", err)
+	}
+	return runID, nil
+}
+
+// CreateScheduledRun creates a run for a specific cron slot, guarded against
+// duplication across scheduler instances. The insert is ON CONFLICT DO NOTHING on
+// (workflow_id, scheduled_for): if another scheduler already created the run for
+// this slot, the insert matches no row, created is false, and no tasks are built.
+// Otherwise it materializes the run exactly like a manual one. Returning created
+// lets the caller tell "I made the run for this slot" from "someone beat me to it".
+func (s *Store) CreateScheduledRun(ctx context.Context, workflowID string, def workflow.WorkflowDef, slot time.Time) (runID string, created bool, err error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return "", false, fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	err = tx.QueryRow(ctx,
+		`INSERT INTO runs (workflow_id, status, scheduled_for)
+		 VALUES ($1, 'pending', $2)
+		 ON CONFLICT (workflow_id, scheduled_for) DO NOTHING
+		 RETURNING id`,
+		workflowID, slot,
+	).Scan(&runID)
+	if err != nil {
+		// No row back means the slot was already taken: not an error, just a
+		// scheduler that lost the race.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("insert scheduled run: %w", err)
+	}
+
+	if err := materializeTasks(ctx, tx, runID, def); err != nil {
+		return "", false, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return "", false, fmt.Errorf("commit: %w", err)
+	}
+	return runID, true, nil
+}
+
+// materializeTasks inserts one task row per task and one dependencies row per edge
+// for an already-created run, then marks the roots Ready. It runs inside the
+// caller's transaction so the whole run is built atomically with the runs row.
+func materializeTasks(ctx context.Context, tx pgx.Tx, runID string, def workflow.WorkflowDef) error {
 	// Task name -> generated UUID, so DependsOn names resolve to real IDs.
 	taskIDs := make(map[string]string, len(def.Tasks))
 
@@ -119,7 +173,7 @@ func (s *Store) CreateRun(ctx context.Context, workflowID string, def workflow.W
 		}
 
 		var taskID string
-		err = tx.QueryRow(ctx,
+		err := tx.QueryRow(ctx,
 			`INSERT INTO tasks (run_id, name, handler, max_attempts, timeout_seconds, status)
 			 VALUES ($1, $2, $3, $4, $5, 'pending')
 			 RETURNING id`,
@@ -127,7 +181,7 @@ func (s *Store) CreateRun(ctx context.Context, workflowID string, def workflow.W
 			runID, t.ID, t.Handler, t.Retries+1, timeout,
 		).Scan(&taskID)
 		if err != nil {
-			return "", fmt.Errorf("insert task %q: %w", t.ID, err)
+			return fmt.Errorf("insert task %q: %w", t.ID, err)
 		}
 		taskIDs[t.ID] = taskID
 	}
@@ -137,15 +191,15 @@ func (s *Store) CreateRun(ctx context.Context, workflowID string, def workflow.W
 		for _, upstreamName := range t.DependsOn {
 			upstreamID, ok := taskIDs[upstreamName]
 			if !ok {
-				return "", fmt.Errorf("task %q depends on unknown task %q", t.ID, upstreamName)
+				return fmt.Errorf("task %q depends on unknown task %q", t.ID, upstreamName)
 			}
-			_, err = tx.Exec(ctx,
+			_, err := tx.Exec(ctx,
 				`INSERT INTO dependencies (run_id, upstream_task_id, downstream_task_id)
 				 VALUES ($1, $2, $3)`,
 				runID, upstreamID, taskIDs[t.ID],
 			)
 			if err != nil {
-				return "", fmt.Errorf("insert edge %q -> %q: %w", upstreamName, t.ID, err)
+				return fmt.Errorf("insert edge %q -> %q: %w", upstreamName, t.ID, err)
 			}
 		}
 	}
@@ -153,7 +207,7 @@ func (s *Store) CreateRun(ctx context.Context, workflowID string, def workflow.W
 	// Roots are the tasks with no incoming edges. Deriving this from the
 	// dependencies rows we just inserted (rather than from DependsOn) means
 	// readiness can never disagree with the edges actually stored.
-	_, err = tx.Exec(ctx,
+	_, err := tx.Exec(ctx,
 		`UPDATE tasks
 		    SET status = 'ready'
 		  WHERE run_id = $1
@@ -164,13 +218,9 @@ func (s *Store) CreateRun(ctx context.Context, workflowID string, def workflow.W
 		runID,
 	)
 	if err != nil {
-		return "", fmt.Errorf("mark roots ready: %w", err)
+		return fmt.Errorf("mark roots ready: %w", err)
 	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return "", fmt.Errorf("commit: %w", err)
-	}
-	return runID, nil
+	return nil
 }
 
 // MarkReadyTasks promotes pending tasks whose upstreams have all succeeded.

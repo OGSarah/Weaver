@@ -43,7 +43,7 @@ func TestClaimTaskNoDoubleClaim(t *testing.T) {
 		Tasks: tasks,
 	}
 
-	workflowID, err := s.CreateWorkflow(ctx, def)
+	workflowID, _, err := s.CreateWorkflow(ctx, def)
 	if err != nil {
 		t.Fatalf("create workflow: %v", err)
 	}

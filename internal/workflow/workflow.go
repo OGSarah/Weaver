@@ -15,6 +15,6 @@ type TaskDef struct {
 // The dependency edges are expressed by each task listing the IDs it depends on, so the entire workflow is one self-contained document.
 type WorkflowDef struct {
 	Name 		string		`json:"name"`
-	Schedule 	string		`json:"omitempty"`
+	Schedule 	string		`json:"schedule,omitempty"`
 	Tasks		[]TaskDef	`json:"tasks"`
 }

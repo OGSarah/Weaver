@@ -119,7 +119,7 @@ func seedDemoRun(ctx context.Context, st *store.Store, n int) (string, error) {
 		Tasks: tasks,
 	}
 
-	workflowID, err := st.CreateWorkflow(ctx, def)
+	workflowID, _, err := st.CreateWorkflow(ctx, def)
 	if err != nil {
 		return "", err
 	}
