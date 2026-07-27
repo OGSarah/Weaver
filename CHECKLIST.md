@@ -55,7 +55,7 @@ Turn a stored workflow definition into a concrete run with task rows ready to ex
 - [x] In the same database transaction, mark the root tasks as Ready.
 - [x] Confirm the state transition rules in code: a task becomes Ready only when all of its upstream tasks have Succeeded.
 - [x] Write a query that, given a run, returns its full current state (every task and its status).
-- [ ] Test by triggering a run manually and inspecting the rows. The roots should be Ready; everything else Pending.
+- [x] Test by triggering a run manually and inspecting the rows. The roots should be Ready; everything else Pending.
 
 You should understand: why creating the run and marking its roots Ready must happen in a single transaction (what breaks if a crash lands between those two steps).
 
@@ -65,11 +65,11 @@ You should understand: why creating the run and marking its roots Ready must hap
 
 This is the concurrency core. Multiple workers will poll the same table, and no task may ever run twice at once.
 
-- [ ] Write the claim query using `SELECT ... FOR UPDATE SKIP LOCKED` to grab one Ready task whose scheduled_at has passed.
-- [ ] In the same transaction, flip the task to Running and write a lease row with an expiry a short time in the future.
-- [ ] Build the worker's main loop: poll for a task, if one is claimed run its handler, otherwise sleep briefly and poll again.
-- [ ] Create a simple handler registry: a map from handler name to a Go function, so tasks know what code to run.
-- [ ] Start two workers at once (in Compose, scale the worker service) and confirm they never grab the same task.
+- [x] Write the claim query using `SELECT ... FOR UPDATE SKIP LOCKED` to grab one Ready task whose scheduled_at has passed.
+- [x] In the same transaction, flip the task to Running and write a lease row with an expiry a short time in the future.
+- [x] Build the worker's main loop: poll for a task, if one is claimed run its handler, otherwise sleep briefly and poll again.
+- [x] Create a simple handler registry: a map from handler name to a Go function, so tasks know what code to run.
+- [x] Start two workers at once (in Compose, scale the worker service) and confirm they never grab the same task.
 
 You should understand: exactly what `SKIP LOCKED` does, and why it lets many workers share one queue table without an external lock service.
 

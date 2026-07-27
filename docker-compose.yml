@@ -17,5 +17,36 @@ services:
       timeout: 5s
       retries: 5
 
+  # Applies migrations once, then exits. Workers wait for it to finish so they
+  # never poll a schema that isn't there yet.
+  migrate:
+    image: migrate/migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations
+    command:
+      - "-path=/migrations"
+      - "-database=postgres://weaver:weaver_dev_password@postgres:5432/weaver?sslmode=disable"
+      - "up"
+
+  # The task worker. No container_name and no fixed hostname, so it scales:
+  #   docker compose up --build --scale worker=2
+  # Each replica gets its own hostname, which becomes its worker id.
+  worker:
+    build:
+      context: .
+      args:
+        BINARY: worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://weaver:weaver_dev_password@postgres:5432/weaver?sslmode=disable
+    restart: unless-stopped
+
 volumes:
   weaver_pgdata:
