@@ -88,6 +88,18 @@ func (s *Store) ClaimTask(ctx context.Context, workerID string, leaseTTL time.Du
 		return nil, fmt.Errorf("write lease for task %s: %w", ct.ID, err)
 	}
 
+	// First claim in a run moves it from pending to running and stamps its start.
+	// coalesce keeps started_at pinned to the first task that ever ran.
+	_, err = tx.Exec(ctx,
+		`UPDATE runs
+		    SET status = 'running', started_at = coalesce(started_at, now())
+		  WHERE id = $1 AND status = 'pending'`,
+		ct.RunID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("mark run %s running: %w", ct.RunID, err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit claim: %w", err)
 	}

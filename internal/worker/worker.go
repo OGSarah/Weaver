@@ -2,6 +2,8 @@ package worker
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -72,27 +74,91 @@ func (w *Worker) Run(ctx context.Context) error {
 	}
 }
 
-// execute runs a claimed task's handler. Recording the result -- marking the
-// task Succeeded or Failed, deleting the lease, and unblocking downstream tasks
-// -- is Phase 5. For now a finished task simply stays Running, which is enough
-// to prove claims never overlap: a Running row is not Ready, so no other worker
-// can take it.
+// execute runs a claimed task's handler and records the outcome: Succeeded on a
+// clean return, Failed (retry or Dead) on an error, panic, or timeout. Either
+// way the lease is released and any unblocked downstream tasks are promoted --
+// all in the store, in one transaction per outcome.
 func (w *Worker) execute(ctx context.Context, task *store.ClaimedTask) {
 	log.Printf("worker %s: claimed task %s (%s) attempt %d/%d",
 		w.ID, task.Name, task.Handler, task.Attempt, task.MaxAttempts)
 
 	handler, ok := w.registry.Lookup(task.Handler)
 	if !ok {
-		log.Printf("worker %s: no handler registered for %q; leaving task %s running (completion is Phase 5)",
-			w.ID, task.Handler, task.Name)
+		// A task naming a handler this worker does not know is a definition bug.
+		// Route it through the failure path so it is visible (and eventually
+		// Dead) rather than silently stranding the run.
+		w.fail(ctx, task, fmt.Errorf("no handler registered for %q", task.Handler))
 		return
 	}
 
-	if err := handler(ctx, *task); err != nil {
-		log.Printf("worker %s: task %s handler returned error: %v", w.ID, task.Name, err)
+	// Enforce the per-task timeout with a child context. Go cannot forcibly stop
+	// a running goroutine, so this is cooperative: a well-behaved handler watches
+	// ctx and returns; the deadline check below covers one that returns late.
+	runCtx, cancel := context.WithTimeout(ctx, time.Duration(task.TimeoutSeconds)*time.Second)
+	defer cancel()
+
+	err := runHandler(runCtx, handler, *task)
+
+	// A cancelled parent means the worker is shutting down, not that the task
+	// failed. Leave the row Running and let its lease expire; the reaper (Phase 6)
+	// returns it to Ready for another worker. Recording a result here would be a
+	// lie about work we abandoned.
+	if ctx.Err() != nil {
+		log.Printf("worker %s: task %s abandoned on shutdown", w.ID, task.Name)
 		return
 	}
-	log.Printf("worker %s: task %s handler finished ok", w.ID, task.Name)
+
+	// The handler exhausting the deadline is a failure even if it returned nil.
+	if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+		w.fail(ctx, task, fmt.Errorf("timed out after %ds", task.TimeoutSeconds))
+		return
+	}
+
+	if err != nil {
+		w.fail(ctx, task, err)
+		return
+	}
+	w.complete(ctx, task)
+}
+
+// complete records a successful run, unblocking downstream tasks. ErrLeaseLost is
+// expected, not exceptional: the lease expired mid-handler and the task is
+// someone else's now, so there is nothing to write.
+func (w *Worker) complete(ctx context.Context, task *store.ClaimedTask) {
+	switch err := w.store.CompleteTask(ctx, task, w.ID); {
+	case err == nil:
+		log.Printf("worker %s: task %s succeeded", w.ID, task.Name)
+	case errors.Is(err, store.ErrLeaseLost):
+		log.Printf("worker %s: task %s lease lost before completion; dropping result", w.ID, task.Name)
+	default:
+		log.Printf("worker %s: recording task %s success failed: %v", w.ID, task.Name, err)
+	}
+}
+
+// fail records a failed run: a backoff-delayed retry if attempts remain, else
+// Dead. cause is what went wrong, stored on the task for the UI and logs.
+func (w *Worker) fail(ctx context.Context, task *store.ClaimedTask, cause error) {
+	log.Printf("worker %s: task %s attempt %d/%d failed: %v",
+		w.ID, task.Name, task.Attempt, task.MaxAttempts, cause)
+	switch err := w.store.FailTask(ctx, task, w.ID, cause.Error()); {
+	case err == nil:
+	case errors.Is(err, store.ErrLeaseLost):
+		log.Printf("worker %s: task %s lease lost before failure recorded; dropping result", w.ID, task.Name)
+	default:
+		log.Printf("worker %s: recording task %s failure failed: %v", w.ID, task.Name, err)
+	}
+}
+
+// runHandler invokes a handler and turns a panic into an ordinary error, so a
+// task that blows up is failed and retried like any other rather than taking the
+// whole worker process down with it.
+func runHandler(ctx context.Context, handler HandlerFunc, task store.ClaimedTask) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("handler panicked: %v", r)
+		}
+	}()
+	return handler(ctx, task)
 }
 
 // wait sleeps for d but returns early if ctx is cancelled, so a shutdown does

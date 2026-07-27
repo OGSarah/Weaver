@@ -2,54 +2,29 @@ package store
 
 import (
 	"context"
-	"encoding/json"
-	"os"
+	"fmt"
 	"testing"
+	"time"
 
 	"weaver/internal/workflow"
 )
 
 func TestCreateRunMarksRootsReady(t *testing.T) {
-	url := os.Getenv("DATABASE_URL")
-	if url == "" {
-		t.Skip("DATABASE_URL not set, skipping integration test")
-	}
-
+	s := newTestStore(t)
 	ctx := context.Background()
-	s, err := New(ctx, url)
-	if err != nil {
-		t.Fatalf("connect: %v", err)
-	}
-	defer s.Close()
 
-	def := workflow.WorkflowDef{
-		Name: "diamond-test",
+	// A unique name per run keeps the workflows name/version unique constraint
+	// from tripping when the suite runs twice against the same database; seedRun
+	// registers cleanup so neither the run nor the workflow row is left behind.
+	runID := seedRun(t, s, workflow.WorkflowDef{
+		Name: fmt.Sprintf("diamond-%d", time.Now().UnixNano()),
 		Tasks: []workflow.TaskDef{
 			{ID: "extract", Handler: "extractData"},
 			{ID: "transform", Handler: "transformData", DependsOn: []string{"extract"}},
 			{ID: "validate", Handler: "validateData", DependsOn: []string{"extract"}},
 			{ID: "load", Handler: "loadWarehouse", DependsOn: []string{"transform", "validate"}},
 		},
-	}
-
-	// Insert the workflow row directly, since CreateWorkflow does not exist yet.
-	raw, err := json.Marshal(def)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-	var workflowID string
-	err = s.pool.QueryRow(ctx,
-		`INSERT INTO workflows (name, definition) VALUES ($1, $2) RETURNING id`,
-		def.Name, raw,
-	).Scan(&workflowID)
-	if err != nil {
-		t.Fatalf("insert workflow: %v", err)
-	}
-
-	runID, err := s.CreateRun(ctx, workflowID, def)
-	if err != nil {
-		t.Fatalf("create run: %v", err)
-	}
+	})
 	t.Logf("run id: %s", runID)
 
 	state, err := s.GetRunState(ctx, runID)

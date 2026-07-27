@@ -79,13 +79,13 @@ You should understand: exactly what `SKIP LOCKED` does, and why it lets many wor
 
 Make a run actually flow from start to finish, including when tasks fail.
 
-- [ ] On successful handler return: mark the task Succeeded and delete its lease, in one transaction.
-- [ ] In that same transaction, check each downstream task and mark it Ready if all of its upstreams have now Succeeded.
-- [ ] When the last task in a run finishes, mark the run itself as complete.
-- [ ] On handler error or panic: mark the task Failed and record the error message.
-- [ ] Implement retries: if attempts remain, schedule the task to become Ready again after an exponential backoff delay (add jitter). If attempts are exhausted, mark it Dead.
-- [ ] Implement timeouts: if a handler runs longer than the task's timeout, treat it as a failure.
-- [ ] Test a full happy-path run end to end, then a run where one task fails and retries, then one where a task exhausts its retries.
+- [x] On successful handler return: mark the task Succeeded and delete its lease, in one transaction.
+- [x] In that same transaction, check each downstream task and mark it Ready if all of its upstreams have now Succeeded.
+- [x] When the last task in a run finishes, mark the run itself as complete.
+- [x] On handler error or panic: mark the task Failed and record the error message.
+- [x] Implement retries: if attempts remain, schedule the task to become Ready again after an exponential backoff delay (add jitter). If attempts are exhausted, mark it Dead.
+- [x] Implement timeouts: if a handler runs longer than the task's timeout, treat it as a failure.
+- [x] Test a full happy-path run end to end, then a run where one task fails and retries, then one where a task exhausts its retries.
 
 You should understand: at-least-once execution and why it forces your handlers to be idempotent (what happens if the same task runs twice because of a retry).
 
