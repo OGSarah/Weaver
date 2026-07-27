@@ -107,6 +107,11 @@ func seedDemoRun(ctx context.Context, st *store.Store, n int) (string, error) {
 		tasks[i] = workflow.TaskDef{
 			ID:      fmt.Sprintf("task-%02d", i),
 			Handler: "demoTask",
+			// Give each task spare attempts so a task stranded by a killed worker
+			// is requeued and finished by another, rather than dying on its first
+			// (and only) attempt. That is what makes the Phase 6 chaos test show
+			// recovery instead of just the attempt-exhaustion path.
+			Retries: 3,
 		}
 	}
 	def := workflow.WorkflowDef{

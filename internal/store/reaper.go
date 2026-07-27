@@ -1,0 +1,168 @@
+package store
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+)
+
+// Heartbeat extends the lease on a task this worker still holds, pushing its
+// expires_at ttl into the future. It is how a live worker says "still working"
+// so the reaper leaves the task alone.
+//
+// The bool reports whether the lease was still the caller's to extend. A false
+// means the row was gone -- the lease already expired and the reaper handed the
+// task to someone else -- so the worker is finishing work it no longer owns and
+// should expect its eventual result to be dropped.
+func (s *Store) Heartbeat(ctx context.Context, taskID, workerID string, ttl time.Duration) (bool, error) {
+	tag, err := s.pool.Exec(ctx,
+		`UPDATE leases
+		    SET expires_at = now() + make_interval(secs => $3)
+		  WHERE task_id = $1 AND worker_id = $2`,
+		taskID, workerID, ttl.Seconds(),
+	)
+	if err != nil {
+		return false, fmt.Errorf("heartbeat lease for task %s: %w", taskID, err)
+	}
+	return tag.RowsAffected() == 1, nil
+}
+
+// expiredLease is one Running task whose worker stopped heartbeating, gathered by
+// the reaper before it decides each task's fate.
+type expiredLease struct {
+	taskID      string
+	runID       string
+	attempt     int
+	maxAttempts int
+}
+
+// ReapExpiredLeases recovers tasks stranded by dead workers. It finds every
+// Running task whose lease has expired -- the worker holding it stopped
+// heartbeating, so it is presumed gone -- and either returns the task to Ready
+// for another worker or, if it has no attempts left, marks it Dead.
+//
+// The attempt check is what stops a genuinely poisonous task (one that reliably
+// kills whatever worker claims it) from being reclaimed forever: each claim has
+// already incremented the attempt count, so once it reaches max_attempts the
+// reaper lets the task die instead of requeuing it. Returns the counts requeued
+// and killed.
+//
+// Everything runs in one transaction. FOR UPDATE OF l SKIP LOCKED locks only the
+// lease rows and steps over any a worker is actively completing, so the reaper
+// and a just-in-time finisher never fight over the same task: whoever commits
+// first wins and the other sees its lease already gone.
+func (s *Store) ReapExpiredLeases(ctx context.Context) (requeued, killed int, err error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return 0, 0, fmt.Errorf("begin: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	rows, err := tx.Query(ctx,
+		`SELECT l.task_id, t.run_id, t.attempt, t.max_attempts
+		   FROM leases l
+		   JOIN tasks t ON t.id = l.task_id
+		  WHERE l.expires_at < now()
+		    AND t.status = 'running'
+		  FOR UPDATE OF l SKIP LOCKED`,
+	)
+	if err != nil {
+		return 0, 0, fmt.Errorf("select expired leases: %w", err)
+	}
+
+	// Drain the cursor before issuing more statements on this transaction: pgx
+	// holds the connection while rows are open, so collect first, then act.
+	var expired []expiredLease
+	for rows.Next() {
+		var e expiredLease
+		if err := rows.Scan(&e.taskID, &e.runID, &e.attempt, &e.maxAttempts); err != nil {
+			rows.Close()
+			return 0, 0, fmt.Errorf("scan expired lease: %w", err)
+		}
+		expired = append(expired, e)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return 0, 0, fmt.Errorf("iterate expired leases: %w", err)
+	}
+
+	for _, e := range expired {
+		// e.attempt is the attempt that was running when the worker died. If it
+		// is below the ceiling another attempt is allowed, so hand the task back;
+		// otherwise the retries are spent and the task dies here.
+		if e.attempt < e.maxAttempts {
+			if err := reapRequeue(ctx, tx, e.taskID); err != nil {
+				return 0, 0, err
+			}
+			requeued++
+		} else {
+			if err := reapKill(ctx, tx, e); err != nil {
+				return 0, 0, err
+			}
+			killed++
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, 0, fmt.Errorf("commit reap: %w", err)
+	}
+	return requeued, killed, nil
+}
+
+// reapRequeue returns a stranded task to Ready and drops its dead lease, in the
+// reaper's transaction. scheduled_at = now() makes it immediately claimable and
+// started_at is cleared so the next attempt times itself from scratch. The error
+// note records why it came back, for the UI and logs; a later success clears it.
+func reapRequeue(ctx context.Context, tx pgx.Tx, taskID string) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE tasks
+		    SET status = 'ready',
+		        started_at = NULL,
+		        scheduled_at = now(),
+		        error = 'worker lease expired; requeued by reaper'
+		  WHERE id = $1 AND status = 'running'`,
+		taskID,
+	)
+	if err != nil {
+		return fmt.Errorf("requeue reaped task %s: %w", taskID, err)
+	}
+	if err := deleteLease(ctx, tx, taskID); err != nil {
+		return err
+	}
+	return nil
+}
+
+// reapKill marks a stranded task Dead once its attempts are spent, fails its run,
+// and drops the lease -- the same terminal outcome as exhausting retries through
+// FailTask, reached because the worker died instead of returning an error.
+func reapKill(ctx context.Context, tx pgx.Tx, e expiredLease) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE tasks
+		    SET status = 'dead',
+		        finished_at = now(),
+		        error = 'worker lease expired; retries exhausted'
+		  WHERE id = $1 AND status = 'running'`,
+		e.taskID,
+	)
+	if err != nil {
+		return fmt.Errorf("kill reaped task %s: %w", e.taskID, err)
+	}
+	if err := markRunFailed(ctx, tx, e.runID); err != nil {
+		return err
+	}
+	if err := deleteLease(ctx, tx, e.taskID); err != nil {
+		return err
+	}
+	return nil
+}
+
+// deleteLease removes a lease by task id. Unlike releaseLease it does not check a
+// worker id: the reaper reclaims a lease precisely because its worker is gone.
+func deleteLease(ctx context.Context, tx pgx.Tx, taskID string) error {
+	if _, err := tx.Exec(ctx, `DELETE FROM leases WHERE task_id = $1`, taskID); err != nil {
+		return fmt.Errorf("delete lease for task %s: %w", taskID, err)
+	}
+	return nil
+}

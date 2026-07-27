@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"weaver/internal/store"
@@ -15,19 +16,25 @@ const (
 	// feel responsive, long enough not to hammer the database when idle.
 	defaultPollInterval = 500 * time.Millisecond
 
-	// How far in the future a fresh lease expires. Heartbeats (Phase 6) push
-	// this out while a handler runs; if the worker dies they stop and the reaper
-	// reclaims the task once this passes.
+	// How far in the future a fresh lease expires. Heartbeats push this out while
+	// a handler runs; if the worker dies they stop and the reaper reclaims the
+	// task once this passes.
 	defaultLeaseTTL = 30 * time.Second
+
+	// How often a running handler renews its lease. Comfortably shorter than the
+	// TTL so a task survives a missed beat (a slow query, a brief GC pause)
+	// without being reaped out from under a worker that is still alive.
+	defaultHeartbeatInterval = defaultLeaseTTL / 3
 )
 
 // Worker is one polling loop: claim a task, run it, repeat. Many workers share
 // one database and one queue table, kept from colliding by the claim query, not
 // by anything in this struct.
 type Worker struct {
-	ID           string
-	PollInterval time.Duration
-	LeaseTTL     time.Duration
+	ID                string
+	PollInterval      time.Duration
+	LeaseTTL          time.Duration
+	HeartbeatInterval time.Duration
 
 	store    *store.Store
 	registry *Registry
@@ -37,11 +44,12 @@ type Worker struct {
 // worker so leases are attributable to it.
 func New(id string, s *store.Store, reg *Registry) *Worker {
 	return &Worker{
-		ID:           id,
-		PollInterval: defaultPollInterval,
-		LeaseTTL:     defaultLeaseTTL,
-		store:        s,
-		registry:     reg,
+		ID:                id,
+		PollInterval:      defaultPollInterval,
+		LeaseTTL:          defaultLeaseTTL,
+		HeartbeatInterval: defaultHeartbeatInterval,
+		store:             s,
+		registry:          reg,
 	}
 }
 
@@ -97,7 +105,24 @@ func (w *Worker) execute(ctx context.Context, task *store.ClaimedTask) {
 	runCtx, cancel := context.WithTimeout(ctx, time.Duration(task.TimeoutSeconds)*time.Second)
 	defer cancel()
 
+	// Renew the lease on a timer for as long as the handler runs. This is the
+	// signal that keeps the reaper away: stop beating (because this process died)
+	// and the lease lapses, letting another worker take over. A live-but-slow
+	// task keeps beating and holds its claim.
+	hbCtx, stopHeartbeat := context.WithCancel(ctx)
+	var hbDone sync.WaitGroup
+	hbDone.Add(1)
+	go func() {
+		defer hbDone.Done()
+		w.heartbeat(hbCtx, task)
+	}()
+
 	err := runHandler(runCtx, handler, *task)
+
+	// Stop heartbeating before we record the outcome, so the lease is not being
+	// renewed underneath CompleteTask/FailTask as they release it.
+	stopHeartbeat()
+	hbDone.Wait()
 
 	// A cancelled parent means the worker is shutting down, not that the task
 	// failed. Leave the row Running and let its lease expire; the reaper (Phase 6)
@@ -146,6 +171,36 @@ func (w *Worker) fail(ctx context.Context, task *store.ClaimedTask, cause error)
 		log.Printf("worker %s: task %s lease lost before failure recorded; dropping result", w.ID, task.Name)
 	default:
 		log.Printf("worker %s: recording task %s failure failed: %v", w.ID, task.Name, err)
+	}
+}
+
+// heartbeat renews the task's lease every HeartbeatInterval until ctx is
+// cancelled (the handler returned, or the worker is shutting down). It only
+// keeps the lease alive; it does not stop the handler. If the lease is already
+// gone -- the reaper decided this worker was dead and reclaimed the task -- there
+// is nothing to renew, so it stops beating and lets the handler finish into the
+// ErrLeaseLost drop that CompleteTask/FailTask already handle.
+func (w *Worker) heartbeat(ctx context.Context, task *store.ClaimedTask) {
+	ticker := time.NewTicker(w.HeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			held, err := w.store.Heartbeat(ctx, task.ID, w.ID, w.LeaseTTL)
+			switch {
+			case err != nil:
+				// A cancelled ctx surfaces here as an error too; do not shout
+				// about it, the loop is about to exit on the ctx.Done case.
+				if ctx.Err() == nil {
+					log.Printf("worker %s: heartbeat for task %s failed: %v", w.ID, task.Name, err)
+				}
+			case !held:
+				log.Printf("worker %s: lost lease on task %s (reaped); heartbeats stopping", w.ID, task.Name)
+				return
+			}
+		}
 	}
 }
 

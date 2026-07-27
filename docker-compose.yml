@@ -31,6 +31,24 @@ services:
       - "-database=postgres://weaver:weaver_dev_password@postgres:5432/weaver?sslmode=disable"
       - "up"
 
+  # The control-plane scheduler. Runs the reaper, which returns tasks stranded by
+  # dead workers to the queue. A single replica is enough (SKIP LOCKED makes more
+  # safe, just redundant), so unlike the worker it keeps a container_name.
+  scheduler:
+    build:
+      context: .
+      args:
+        BINARY: scheduler
+    container_name: weaver-scheduler
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgres://weaver:weaver_dev_password@postgres:5432/weaver?sslmode=disable
+    restart: unless-stopped
+
   # The task worker. No container_name and no fixed hostname, so it scales:
   #   docker compose up --build --scale worker=2
   # Each replica gets its own hostname, which becomes its worker id.

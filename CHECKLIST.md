@@ -95,11 +95,11 @@ You should understand: at-least-once execution and why it forces your handlers t
 
 The senior-level payoff. Prove that a run resumes when a worker dies mid-task.
 
-- [ ] Add heartbeats: while a handler runs, periodically extend the lease's expires_at.
-- [ ] Write the reaper: a routine that finds Running tasks whose lease has expired and returns them to Ready.
-- [ ] Run the reaper on a timer inside the scheduler binary.
-- [ ] Chaos test: start a run, then hard-kill a worker (not a graceful shutdown) while it holds a task. Confirm the reaper reclaims the task and another worker finishes it.
-- [ ] Confirm the reclaimed task respects its attempt count so a genuinely stuck task cannot loop forever.
+- [x] Add heartbeats: while a handler runs, periodically extend the lease's expires_at.
+- [x] Write the reaper: a routine that finds Running tasks whose lease has expired and returns them to Ready.
+- [x] Run the reaper on a timer inside the scheduler binary.
+- [x] Chaos test: start a run, then hard-kill a worker (not a graceful shutdown) while it holds a task. Confirm the reaper reclaims the task and another worker finishes it.
+- [x] Confirm the reclaimed task respects its attempt count so a genuinely stuck task cannot loop forever.
 
 You should understand: how leases plus heartbeats distinguish "a worker is still working" from "a worker has died", and why this is more reliable than asking workers to report their own death.
 
