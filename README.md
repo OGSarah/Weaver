@@ -271,8 +271,9 @@ open in a browser and real runs moving through it.
 - **Docker** (Docker Desktop, OrbStack, or equivalent) for Postgres and the three services.
 - **Go 1.22+** only if you want to run the binaries outside Docker. The routing uses
   the standard library's method-and-path patterns, which landed in 1.22.
-- **Node 18+** only if you intend to change the frontend. The built bundle is
-  committed, so a fresh clone renders the UI without ever running npm.
+- **Node 18+** only if you intend to change the frontend *and* run the API outside
+  Docker. The image builds the bundle itself, so `docker compose up` renders the UI
+  on a machine with no Node installed at all.
 
 ### 1. Clone
 
@@ -399,18 +400,23 @@ attempt number. Nothing is lost and nothing runs twice.
 
 ## Frontend development
 
-Skip this unless you are changing the UI. The built bundle is committed, so the steps
-above never need npm.
+Skip this unless you are changing the UI. The Docker image builds the bundle itself,
+so the steps above never need npm.
 
 The UI is a React app under `web/`, bundled with esbuild (no Vite). The Go API serves
 the built assets, so there is one origin and no CORS: API routes live under `/api`,
 and every other path falls through to the file server. A browser call is just
 `fetch('/api/workflows')`, with no host and no port.
 
-The API reads the frontend from disk rather than embedding it, so a rebuilt bundle
-needs only a browser refresh. It looks in `./web` by default; set `WEB_DIR` to
-override (Compose bind-mounts `./web` and sets it to `/web`, which is why a rebuild on
-the host is live inside the container with no image rebuild).
+The API reads the frontend from disk rather than embedding it, and looks in `./web`
+by default (`WEB_DIR` overrides it; the image sets it to `/web`). So a rebuilt bundle
+needs only a browser refresh, with no Go rebuild.
+
+**Work on the frontend with the API on the host, not in Docker.** The image bakes the
+bundle in at build time, so a change only reaches a container through
+`docker compose up --build`, which is far too slow a loop to design against. Run
+Postgres in Compose and everything else locally, as in [Running without
+Docker](#running-without-docker), then:
 
 ```bash
 cd web
@@ -418,6 +424,9 @@ npm install     # once
 npm run dev     # rebuild on every save
 npm run build   # one-shot build
 ```
+
+`npm run dev` writes straight into `web/dist/`, which is where the host API is already
+reading from, so the loop is: save, refresh.
 
 Both commands bundle `src/main.jsx`, resolving imports and transforming JSX into
 `dist/bundle.js`, which `index.html` loads. `npm run dev` only rebuilds the bundle; it
@@ -437,16 +446,24 @@ from them rather than writing literal colours.
 
 ## Running without Docker
 
-Useful when iterating on Go code, since it skips an image rebuild each time.
+Useful when iterating on Go code, since it skips an image rebuild each time, and the
+only sensible way to work on the frontend.
+
+This path needs Node, because nothing has built the UI for you. `web/dist/` is not in
+the repo; under Docker the image builds it, and here you do. Skip the first two lines
+if you only care about the API and are happy for the page to be blank.
 
 ```bash
+# Build the UI once (or `npm run dev` to keep rebuilding on save)
+cd web && npm install && npm run build && cd ..
+
 # Postgres still comes from Compose
 docker compose up -d postgres
 
 export DATABASE_URL='postgres://weaver:weaver_dev_password@localhost:5432/weaver?sslmode=disable'
 make migrate-up
 
-go run ./cmd/api        # :8080, also serves the UI
+go run ./cmd/api        # :8080, serves the API and web/ from disk
 go run ./cmd/worker     # run this in two terminals for two workers
 go run ./cmd/scheduler  # cron loop and reaper
 ```

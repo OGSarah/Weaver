@@ -2,10 +2,10 @@
 # installs are reproducible without carrying the tree itself.
 node_modules/
 
-# The built bundle IS committed on purpose: it lets a fresh clone run
-# `docker compose up` and get a working UI with no npm step. See the "Tradeoffs and
-# decisions" section of the README.
-# web/dist/
+# Build output: the bundle and the assets esbuild emits beside it. Not committed,
+# because the Dockerfile's web stage builds them, so a fresh clone still needs no
+# Node toolchain to get a working UI out of `docker compose up --build`.
+web/dist/
 
 # macOS directory metadata.
 .DS_Store

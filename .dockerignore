@@ -1,0 +1,22 @@
+# Everything here is either rebuilt inside the image or has no business in the build
+# context. A smaller context is a faster build: Docker ships the whole thing to the
+# daemon before the first instruction runs.
+
+# Installed by `npm ci` in the web stage. Tens of megabytes, and platform-specific
+# binaries (esbuild ships one per OS and arch) that would be wrong for the container.
+web/node_modules/
+
+# Built by the web stage. Excluding it also guarantees the image cannot accidentally
+# ship a stale bundle from the host instead of the one it just built.
+web/dist/
+
+# History, editor and OS noise.
+.git/
+.gitignore
+.DS_Store
+
+# Documentation and screenshots. docs/branding is deliberately NOT excluded: the
+# frontend imports the wordmark from there, so the web stage needs it.
+docs/screenshots/
+*.md
+LICENSE
