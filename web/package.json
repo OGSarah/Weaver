@@ -8,7 +8,9 @@
   "main": "index.js",
   "scripts": {
     "build": "esbuild src/main.jsx --bundle --outfile=dist/bundle.js --loader:.png=file --public-path=/dist",
-    "dev": "esbuild src/main.jsx --bundle --outfile=dist/bundle.js --loader:.png=file --public-path=/dist --watch"
+    "dev": "esbuild src/main.jsx --bundle --outfile=dist/bundle.js --loader:.png=file --public-path=/dist --watch",
+    "test": "node --test",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.0.0",
@@ -16,6 +18,10 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
-    "esbuild": "^0.28.1"
+    "@eslint/js": "^10.0.1",
+    "esbuild": "^0.28.1",
+    "eslint": "^10.8.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.8.0"
   }
 }

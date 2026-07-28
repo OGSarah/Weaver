@@ -1,5 +1,5 @@
 <p align="center">
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="docs/branding/weaver-wordmark.png" alt="Weaver" width="600">
+  <img src="docs/branding/weaver-wordmark.png" alt="Weaver" width="396">
 </p>
 
 <p align="center">
@@ -8,6 +8,11 @@
 </p>
 
 A DAG-based job scheduler and workflow orchestrator. Weaver lets you define workflows as directed acyclic graphs of tasks, schedule them, execute them across a pool of workers, and recover automatically when things fail. Think of it as a small, readable, from-scratch take on the ideas behind Airflow and Temporal.
+
+[![Go tests](https://github.com/OGSarah/Weaver/actions/workflows/go-test.yml/badge.svg)](https://github.com/OGSarah/Weaver/actions/workflows/go-test.yml)
+[![Go lint](https://github.com/OGSarah/Weaver/actions/workflows/go-lint.yml/badge.svg)](https://github.com/OGSarah/Weaver/actions/workflows/go-lint.yml)
+[![Web tests](https://github.com/OGSarah/Weaver/actions/workflows/web-test.yml/badge.svg)](https://github.com/OGSarah/Weaver/actions/workflows/web-test.yml)
+[![Web lint](https://github.com/OGSarah/Weaver/actions/workflows/web-lint.yml/badge.svg)](https://github.com/OGSarah/Weaver/actions/workflows/web-lint.yml)
 
 ## Features
 
@@ -18,6 +23,146 @@ A DAG-based job scheduler and workflow orchestrator. Weaver lets you define work
 - Automatic recovery of tasks orphaned by dead workers.
 - A React UI that renders the DAG, shows live run status, and exposes logs and run history.
 - A REST API for triggering runs, inspecting state, and managing workflow definitions.
+
+<details>
+<summary><h2>Getting started</h2></summary>
+
+Everything below assumes a clean machine and a clean database, and ends with the UI
+open in a browser and real runs moving through it.
+
+### Prerequisites
+
+- **Docker** (Docker Desktop, OrbStack, or equivalent) for Postgres and the three services.
+- **Go 1.22+** only if you want to run the binaries outside Docker. The routing uses
+  the standard library's method-and-path patterns, which landed in 1.22.
+- **Node 18+** only if you intend to change the frontend *and* run the API outside
+  Docker. The image builds the bundle itself, so `docker compose up` renders the UI
+  on a machine with no Node installed at all.
+
+### 1. Clone
+
+```bash
+git clone <your-repo-url> weaver
+cd weaver
+```
+
+### 2. Start everything
+
+```bash
+docker compose up --build --scale worker=2
+```
+
+That brings up five things: Postgres, a one-shot `migrate` container that applies
+every migration in `migrations/` and exits, the API on port 8080, the scheduler
+(which runs the cron loop and the reaper), and two workers. The workers wait for the
+migration container to finish, so they never poll a schema that is not there yet.
+
+Two workers rather than one because a single worker runs its tasks one at a time; with
+two you can watch independent branches of a DAG execute in parallel.
+
+Leave it running and open a second terminal for the next step.
+
+### 3. Register two example workflows
+
+Nothing is registered by default, so the UI starts empty. These two are enough to see
+every state the system has. Both use the demo handlers wired up in
+[`cmd/worker/main.go`](cmd/worker/main.go), which sleep for a random 200-1000ms and
+log as they go.
+
+A healthy pipeline, shaped as a diamond so two tasks run in parallel:
+
+```bash
+curl -s localhost:8080/api/workflows -H 'Content-Type: application/json' -d '{
+  "name": "etl-pipeline",
+  "tasks": [
+    {"id": "extract",   "handler": "extractData"},
+    {"id": "transform", "handler": "transformData", "dependsOn": ["extract"]},
+    {"id": "validate",  "handler": "validateData",  "dependsOn": ["extract"]},
+    {"id": "load",      "handler": "loadWarehouse", "dependsOn": ["transform", "validate"]},
+    {"id": "notify",    "handler": "sendEmail",     "dependsOn": ["load"]}
+  ]}'
+```
+
+And one that fails on purpose. `noSuchHandler` is not in the registry, so the task
+fails every attempt: the cheapest way to watch the retry and backoff machinery
+without waiting for a real flake.
+
+```bash
+curl -s localhost:8080/api/workflows -H 'Content-Type: application/json' -d '{
+  "name": "flaky-pipeline",
+  "tasks": [
+    {"id": "extract",    "handler": "extractData"},
+    {"id": "broken",     "handler": "noSuchHandler", "retries": 3, "dependsOn": ["extract"]},
+    {"id": "never-runs", "handler": "sendEmail",     "dependsOn": ["broken"]}
+  ]}'
+```
+
+Each returns the new workflow's id and version.
+
+### 4. Open the UI
+
+[http://localhost:8080](http://localhost:8080)
+
+Pick a workflow on the left, press **Trigger run**, and watch. The next section is a
+tour of what is worth looking at.
+
+### Scaling and stopping
+
+```bash
+docker compose up --scale worker=4   # more workers, same queue
+docker compose down                  # stop, keeping the database volume
+docker compose down -v               # stop and delete all data
+```
+
+### What to try
+
+The demo handlers finish in well under a second, so a run is over in a few seconds.
+Trigger things more than once.
+
+**Watch a run execute.** Pick `etl-pipeline` and press **Trigger run**. Nodes move
+grey -> blue -> amber (pulsing) -> green as the workers pick them up. `transform` and
+`validate` both depend only on `extract`, so with two workers they go amber together,
+and `load` stays grey until both are green. That is the dependency resolution doing
+its job, visible.
+
+**Open a task while it is running.** Click any node. The panel on the right shows its
+timings, its handler, and its log, and keeps up with it: log lines appear as the
+handler writes them and Duration counts up as `755ms (running)` until the task lands.
+
+**Watch a task retry and die.** Trigger `flaky-pipeline`. `broken` turns orange
+(`FAILED`, with a `2/4` attempt counter) between attempts, then red (`DEAD`) once its
+attempts are gone. Click it: the log is grouped by attempt, and each group records
+the jittered backoff that followed it, something like `retrying in 582ms (attempt 2
+of 4)`. Notice `never-runs` stays grey forever, because a downstream task of a dead
+task is never unblocked.
+
+**Read the run history.** Bottom left, newest first. The bar under each row is that
+run's tasks broken down by state, so a run that half-finished is distinguishable from
+one that failed immediately without opening either. Hover for exact counts, click to
+reopen a run and inspect it exactly as if it were live.
+
+**Cancel a run.** Trigger `etl-pipeline`, then, while it is still going:
+
+```bash
+curl -s -X POST localhost:8080/api/runs/<run-id>/cancel
+```
+
+Anything not yet started turns to dashed `CANCELLED` outlines. The UI never learns
+about this directly; it just polls, which is the point of keeping the UI a read layer.
+
+**Kill a worker mid-task.** The Phase 6 payoff, and the most interesting thing here:
+
+```bash
+docker compose kill --signal=SIGKILL worker
+```
+
+`SIGKILL` gives the worker no chance to release its lease. Its task sits in `RUNNING`
+until the lease expires (30s), the reaper notices, and the task goes back to `FAILED`
+with `worker lease expired; requeued by reaper` in its log. Bring workers back with
+`docker compose up -d --scale worker=2` and another one finishes it, on the next
+attempt number. Nothing is lost and nothing runs twice.
+
+</details>
 
 <details>
 <summary><h2>Understanding DAGS</h2></summary>
@@ -268,146 +413,6 @@ Deliberately not used: a separate message broker (Redis, RabbitMQ, Kafka) or an 
 </details>
 
 <details>
-<summary><h2>Getting started</h2></summary>
-
-Everything below assumes a clean machine and a clean database, and ends with the UI
-open in a browser and real runs moving through it.
-
-### Prerequisites
-
-- **Docker** (Docker Desktop, OrbStack, or equivalent) for Postgres and the three services.
-- **Go 1.22+** only if you want to run the binaries outside Docker. The routing uses
-  the standard library's method-and-path patterns, which landed in 1.22.
-- **Node 18+** only if you intend to change the frontend *and* run the API outside
-  Docker. The image builds the bundle itself, so `docker compose up` renders the UI
-  on a machine with no Node installed at all.
-
-### 1. Clone
-
-```bash
-git clone <your-repo-url> weaver
-cd weaver
-```
-
-### 2. Start everything
-
-```bash
-docker compose up --build --scale worker=2
-```
-
-That brings up five things: Postgres, a one-shot `migrate` container that applies
-every migration in `migrations/` and exits, the API on port 8080, the scheduler
-(which runs the cron loop and the reaper), and two workers. The workers wait for the
-migration container to finish, so they never poll a schema that is not there yet.
-
-Two workers rather than one because a single worker runs its tasks one at a time; with
-two you can watch independent branches of a DAG execute in parallel.
-
-Leave it running and open a second terminal for the next step.
-
-### 3. Register two example workflows
-
-Nothing is registered by default, so the UI starts empty. These two are enough to see
-every state the system has. Both use the demo handlers wired up in
-[`cmd/worker/main.go`](cmd/worker/main.go), which sleep for a random 200-1000ms and
-log as they go.
-
-A healthy pipeline, shaped as a diamond so two tasks run in parallel:
-
-```bash
-curl -s localhost:8080/api/workflows -H 'Content-Type: application/json' -d '{
-  "name": "etl-pipeline",
-  "tasks": [
-    {"id": "extract",   "handler": "extractData"},
-    {"id": "transform", "handler": "transformData", "dependsOn": ["extract"]},
-    {"id": "validate",  "handler": "validateData",  "dependsOn": ["extract"]},
-    {"id": "load",      "handler": "loadWarehouse", "dependsOn": ["transform", "validate"]},
-    {"id": "notify",    "handler": "sendEmail",     "dependsOn": ["load"]}
-  ]}'
-```
-
-And one that fails on purpose. `noSuchHandler` is not in the registry, so the task
-fails every attempt: the cheapest way to watch the retry and backoff machinery
-without waiting for a real flake.
-
-```bash
-curl -s localhost:8080/api/workflows -H 'Content-Type: application/json' -d '{
-  "name": "flaky-pipeline",
-  "tasks": [
-    {"id": "extract",    "handler": "extractData"},
-    {"id": "broken",     "handler": "noSuchHandler", "retries": 3, "dependsOn": ["extract"]},
-    {"id": "never-runs", "handler": "sendEmail",     "dependsOn": ["broken"]}
-  ]}'
-```
-
-Each returns the new workflow's id and version.
-
-### 4. Open the UI
-
-[http://localhost:8080](http://localhost:8080)
-
-Pick a workflow on the left, press **Trigger run**, and watch. The next section is a
-tour of what is worth looking at.
-
-### Scaling and stopping
-
-```bash
-docker compose up --scale worker=4   # more workers, same queue
-docker compose down                  # stop, keeping the database volume
-docker compose down -v               # stop and delete all data
-```
-
-### What to try
-
-The demo handlers finish in well under a second, so a run is over in a few seconds.
-Trigger things more than once.
-
-**Watch a run execute.** Pick `etl-pipeline` and press **Trigger run**. Nodes move
-grey -> blue -> amber (pulsing) -> green as the workers pick them up. `transform` and
-`validate` both depend only on `extract`, so with two workers they go amber together,
-and `load` stays grey until both are green. That is the dependency resolution doing
-its job, visible.
-
-**Open a task while it is running.** Click any node. The panel on the right shows its
-timings, its handler, and its log, and keeps up with it: log lines appear as the
-handler writes them and Duration counts up as `755ms (running)` until the task lands.
-
-**Watch a task retry and die.** Trigger `flaky-pipeline`. `broken` turns orange
-(`FAILED`, with a `2/4` attempt counter) between attempts, then red (`DEAD`) once its
-attempts are gone. Click it: the log is grouped by attempt, and each group records
-the jittered backoff that followed it, something like `retrying in 582ms (attempt 2
-of 4)`. Notice `never-runs` stays grey forever, because a downstream task of a dead
-task is never unblocked.
-
-**Read the run history.** Bottom left, newest first. The bar under each row is that
-run's tasks broken down by state, so a run that half-finished is distinguishable from
-one that failed immediately without opening either. Hover for exact counts, click to
-reopen a run and inspect it exactly as if it were live.
-
-**Cancel a run.** Trigger `etl-pipeline`, then, while it is still going:
-
-```bash
-curl -s -X POST localhost:8080/api/runs/<run-id>/cancel
-```
-
-Anything not yet started turns to dashed `CANCELLED` outlines. The UI never learns
-about this directly; it just polls, which is the point of keeping the UI a read layer.
-
-**Kill a worker mid-task.** The Phase 6 payoff, and the most interesting thing here:
-
-```bash
-docker compose kill --signal=SIGKILL worker
-```
-
-`SIGKILL` gives the worker no chance to release its lease. Its task sits in `RUNNING`
-until the lease expires (30s), the reaper notices, and the task goes back to `FAILED`
-with `worker lease expired; requeued by reaper` in its log. Bring workers back with
-`docker compose up -d --scale worker=2` and another one finishes it, on the next
-attempt number. Nothing is lost and nothing runs twice.
-
-</details>
-
-<details>
 <summary><h2>Frontend development</h2></summary>
 
 Skip this unless you are changing the UI. The Docker image builds the bundle itself,
@@ -433,6 +438,8 @@ cd web
 npm install     # once
 npm run dev     # rebuild on every save
 npm run build   # one-shot build
+npm test        # unit tests for the pure modules (node --test)
+npm run lint    # eslint, the same check CI runs
 ```
 
 `npm run dev` writes straight into `web/dist/`, which is where the host API is already

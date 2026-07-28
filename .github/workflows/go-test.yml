@@ -1,0 +1,27 @@
+name: Go tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: go test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # DATABASE_URL is deliberately unset: the store's integration tests skip
+      # themselves without it, so this job is the unit suite and stays fast.
+      - run: go build ./...
+      - run: go test -race ./...

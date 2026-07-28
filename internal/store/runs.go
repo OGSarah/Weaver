@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"weaver/internal/workflow"
 	"github.com/jackc/pgx/v5"
+	"weaver/internal/workflow"
 )
 
 const defaultTimeoutSeconds = 300

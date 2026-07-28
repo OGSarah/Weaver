@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { layoutDag, edgePath } from "./layout.js";
 import { statusColors, STATUS_ORDER } from "./status.js";
-import { color, font, shared } from "./theme.js";
+import { color, font } from "./theme.js";
 
 // Dag draws a workflow as a directed graph: one box per task, one arrow per
 // dependency, roots at the top.
