@@ -2,6 +2,11 @@
   <img src="docs/branding/weaver-wordmark.png" alt="Weaver" width="600">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/weaver-ui.png" width="900"
+       alt="The Weaver UI: a workflow drawn as a DAG with every task succeeded, a run history down the left, and a task detail panel on the right showing its timings and log">
+</p>
+
 Currently WIP
 
 TODO: Add CI/CD with GitHub actions
@@ -458,15 +463,6 @@ DELETE FROM runs WHERE workflow_id IN (
 DELETE FROM workflows WHERE name LIKE 'claim-test-%' OR name LIKE 'demo-%';"
 ```
 
-## Screenshots
- 
-Screenshots of the UI go here once the frontend is built (Phase 8). Drop image files into a `docs/screenshots/` folder in the repo and update the paths in the table below.
- 
-| DAG view | Live run status | Run history |
-| :---: | :---: | :---: |
-| ![Workflow DAG view](docs/screenshots/dag-view.png) | ![Live run status](docs/screenshots/run-status.png) | ![Run history](docs/screenshots/run-history.png) |
-| A workflow rendered as a graph | A run in progress, tasks colored by state | The run history and list view |
- 
 ## API sketch
  
 Every API route lives under `/api`. Everything outside that prefix is the UI, served
