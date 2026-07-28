@@ -7,8 +7,6 @@
        alt="The Weaver UI: a workflow drawn as a DAG with every task succeeded, a run history down the left, and a task detail panel on the right showing its timings and log">
 </p>
 
-TODO: Add CI/CD with GitHub actions
-
 A DAG-based job scheduler and workflow orchestrator. Weaver lets you define workflows as directed acyclic graphs of tasks, schedule them, execute them across a pool of workers, and recover automatically when things fail. Think of it as a small, readable, from-scratch take on the ideas behind Airflow and Temporal.
 
 ## Why this exists
@@ -545,17 +543,6 @@ The parts worth proving out with tests or manual chaos:
 - Trigger the same run twice and confirm idempotent handlers do not double-apply effects.
 - Force a task to fail repeatedly and confirm backoff timing, then confirm it lands in DEAD after attempts are exhausted.
 - Start many workers against a small queue and confirm no task is executed by two workers at once.
-
-### `web/dist/` is committed
-
-Committing build output is normally a smell. It is here so a fresh clone plus
-`docker compose up --build` produces a working UI with no Node toolchain involved.
-That covers `bundle.js` and the hashed copy of the wordmark esbuild emits beside it;
-both are build products, and both have to be present for the page to render.
-
-**The cost:** every frontend change produces a large, unreadable diff, and the
-committed artifact can silently drift from the source that supposedly produced it.
-Worth revisiting when the UI is real: the fix is a Node stage in the Dockerfile.
 
 ## License
 
