@@ -138,13 +138,13 @@ smaller config.
  
 Scaffold the React app with your own build:
  
-- [ ] Create a `web/` folder at the project root, a sibling to `cmd/` and `internal/`.
-- [ ] `npm init` inside `web/`, then install React: `npm install react react-dom`.
-- [ ] Install the bundler as a dev dependency: `npm install --save-dev esbuild`.
-- [ ] Add a static `web/index.html` with a single `<div id="root">` and a `<script src="/dist/bundle.js">`.
-- [ ] Create the entry file `web/src/main.jsx` that mounts a placeholder React component into `#root`.
-- [ ] Add build scripts to `package.json`: a one-shot `build` and a `--watch` dev script that rebuilds on change. Point esbuild at `src/main.jsx`, enable JSX, and output to `dist/bundle.js`.
-- [ ] Run the watch script and confirm the placeholder component renders in a browser. This proves the bundler, JSX transform, and React mount all work before any Weaver-specific code.
+- [x] Create a `web/` folder at the project root, a sibling to `cmd/` and `internal/`.
+- [x] `npm init` inside `web/`, then install React: `npm install react react-dom`.
+- [x] Install the bundler as a dev dependency: `npm install --save-dev esbuild`.
+- [x] Add a static `web/index.html` with a single `<div id="root">` and a `<script src="/dist/bundle.js">`.
+- [x] Create the entry file `web/src/main.jsx` that mounts a placeholder React component into `#root`.
+- [x] Add build scripts to `package.json`: a one-shot `build` and a `--watch` dev script that rebuilds on change. Point esbuild at `src/main.jsx`, enable JSX, and output to `dist/bundle.js`.
+- [x] Run the watch script and confirm the placeholder component renders in a browser. This proves the bundler, JSX transform, and React mount all work before any Weaver-specific code.
 - [ ] Decide how the browser reaches the API. Simplest for this setup: have the Go API serve `web/` as static files, so the UI and API share one origin and there is no CORS or proxy. (Alternative: run esbuild's dev server and proxy `/api` to `:8080`.)
 - [ ] Smoke test the connection: one `fetch` to an existing endpoint (list workflows or get a run), logged to the console. JSON coming back proves the whole chain (static serving, API, database) end to end.
 Then build the views:
