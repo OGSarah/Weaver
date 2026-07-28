@@ -25,6 +25,14 @@ type workflowResponse struct {
 	CreatedAt string `json:"createdAt,omitempty"`
 }
 
+// workflowDetailResponse is the metadata plus the task list, the shape
+// GET /workflows/{id} returns. The dependency edges ride along inside each task's
+// dependsOn, so this single document is everything the UI needs to draw the DAG.
+type workflowDetailResponse struct {
+	workflowResponse
+	Tasks []workflow.TaskDef `json:"tasks"`
+}
+
 // handleRegisterWorkflow validates a workflow definition and stores it as a new
 // version. It rejects a malformed DAG (including cycles) and a bad cron schedule
 // with a 400 before anything is persisted.
@@ -83,6 +91,40 @@ func (s *Server) handleListWorkflows(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// handleGetWorkflow returns one workflow with its full task list. The list
+// endpoint deliberately omits the definition (it would send every DAG to render a
+// menu), so this is what the UI fetches once the user picks a workflow to draw.
+func (s *Server) handleGetWorkflow(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(r.PathValue("id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "workflow id is required")
+		return
+	}
+
+	wf, err := s.store.GetWorkflow(r.Context(), id)
+	if err != nil {
+		writeStoreError(w, "get workflow", err)
+		return
+	}
+
+	// Encode an empty task list as [] rather than null, so the client can map over
+	// it without a nil check.
+	tasks := wf.Def.Tasks
+	if tasks == nil {
+		tasks = []workflow.TaskDef{}
+	}
+	writeJSON(w, http.StatusOK, workflowDetailResponse{
+		workflowResponse: workflowResponse{
+			ID:        wf.ID,
+			Name:      wf.Name,
+			Schedule:  wf.Schedule,
+			Version:   wf.Version,
+			CreatedAt: wf.CreatedAt.UTC().Format(timeFormat),
+		},
+		Tasks: tasks,
+	})
 }
 
 // handleTriggerRun materializes a new run from a stored workflow definition and

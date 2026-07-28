@@ -271,7 +271,9 @@ as static files by the same binary on the same origin.
 
 ```
 POST   /api/workflows              register or update a workflow definition
-GET    /api/workflows              list workflows
+GET    /api/workflows              list workflows (metadata only, no task lists)
+GET    /api/workflows/:id          fetch one workflow with its full task list,
+                                   including the dependency edges the UI draws
 POST   /api/workflows/:id/runs     trigger a run
 GET    /api/runs/:id               fetch run status and task states
 GET    /api/runs/:id/tasks/:tid    fetch a single task, including logs

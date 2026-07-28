@@ -149,7 +149,7 @@ Scaffold the React app with your own build:
 - [x] Smoke test the connection: one `fetch` to an existing endpoint (list workflows or get a run), logged to the console. JSON coming back proves the whole chain (static serving, API, database) end to end.
 Then build the views:
  
-- [ ] Render a workflow as a DAG using a graph library, so dependencies are visible.
+- [x] Render a workflow as a DAG using a graph library, so dependencies are visible.
 - [ ] Show a run's live status: color each task node by state (Pending, Ready, Running, Succeeded, Failed, Dead) and poll for updates.
 - [ ] Add a run history view and a per-task log/detail panel.
 - [ ] Write a README section documenting how to run the whole thing locally, including the frontend build step.
