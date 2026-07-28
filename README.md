@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/weaver-safari-macbook.png" width="900"
+  <img src="docs/screenshots/weaver-safari-macbookgf.png" width="900"
        alt="The Weaver UI: a workflow drawn as a DAG with every task succeeded, a run history down the left, and a task detail panel on the right showing its timings and log">
 </p>
 
