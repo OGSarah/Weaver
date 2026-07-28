@@ -93,7 +93,7 @@ func (s *Store) ReapExpiredLeases(ctx context.Context) (requeued, killed int, er
 		// is below the ceiling another attempt is allowed, so hand the task back;
 		// otherwise the retries are spent and the task dies here.
 		if e.attempt < e.maxAttempts {
-			if err := reapRequeue(ctx, tx, e.taskID); err != nil {
+			if err := reapRequeue(ctx, tx, e); err != nil {
 				return 0, 0, err
 			}
 			requeued++
@@ -126,7 +126,7 @@ func (s *Store) ReapExpiredLeases(ctx context.Context) (requeued, killed int, er
 // claimable immediately. A dead worker is not evidence that the task itself is
 // slow to settle, so there is nothing to wait out. The attempt ceiling is what
 // stops a task that reliably kills workers from cycling forever.
-func reapRequeue(ctx context.Context, tx pgx.Tx, taskID string) error {
+func reapRequeue(ctx context.Context, tx pgx.Tx, e expiredLease) error {
 	_, err := tx.Exec(ctx,
 		`UPDATE tasks
 		    SET status = 'failed',
@@ -134,12 +134,21 @@ func reapRequeue(ctx context.Context, tx pgx.Tx, taskID string) error {
 		        scheduled_at = now(),
 		        error = 'worker lease expired; requeued by reaper'
 		  WHERE id = $1 AND status = 'running'`,
-		taskID,
+		e.taskID,
 	)
 	if err != nil {
-		return fmt.Errorf("requeue reaped task %s: %w", taskID, err)
+		return fmt.Errorf("requeue reaped task %s: %w", e.taskID, err)
 	}
-	if err := deleteLease(ctx, tx, taskID); err != nil {
+	// The worker that was running this attempt died without writing anything, so
+	// this line is the only record of how the attempt ended. Without it the log
+	// would jump from "attempt 2 started" straight to "attempt 3 started" with no
+	// explanation of what happened in between.
+	if err := appendTaskLogTx(ctx, tx, e.taskID, e.attempt, LogError,
+		fmt.Sprintf("attempt %d abandoned: worker lease expired, requeued by reaper", e.attempt),
+	); err != nil {
+		return err
+	}
+	if err := deleteLease(ctx, tx, e.taskID); err != nil {
 		return err
 	}
 	return nil
@@ -159,6 +168,11 @@ func reapKill(ctx context.Context, tx pgx.Tx, e expiredLease) error {
 	)
 	if err != nil {
 		return fmt.Errorf("kill reaped task %s: %w", e.taskID, err)
+	}
+	if err := appendTaskLogTx(ctx, tx, e.taskID, e.attempt, LogError,
+		fmt.Sprintf("attempt %d abandoned: worker lease expired, no attempts left; giving up", e.attempt),
+	); err != nil {
+		return err
 	}
 	if err := markRunFailed(ctx, tx, e.runID); err != nil {
 		return err

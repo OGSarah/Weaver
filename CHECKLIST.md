@@ -151,7 +151,7 @@ Then build the views:
  
 - [x] Render a workflow as a DAG using a graph library, so dependencies are visible.
 - [x] Show a run's live status: color each task node by state (Pending, Ready, Running, Succeeded, Failed, Dead) and poll for updates.
-- [ ] Add a run history view and a per-task log/detail panel.
+- [x] Add a run history view and a per-task log/detail panel. Includes capturing task logs to Postgres, since there was nowhere for logs to come from before.
 - [ ] Write a README section documenting how to run the whole thing locally, including the frontend build step.
 Stretch goals:
  

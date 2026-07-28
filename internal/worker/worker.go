@@ -117,7 +117,18 @@ func (w *Worker) execute(ctx context.Context, task *store.ClaimedTask) {
 		w.heartbeat(hbCtx, task)
 	}()
 
-	err := runHandler(runCtx, handler, *task)
+	// The logger is bound to this attempt, not just this task, so a retry's lines
+	// are attributable to the attempt that wrote them.
+	taskLog := &TaskLogger{
+		ctx:      ctx,
+		store:    w.store,
+		taskID:   task.ID,
+		attempt:  task.Attempt,
+		taskName: task.Name,
+		workerID: w.ID,
+	}
+
+	err := runHandler(runCtx, handler, *task, taskLog)
 
 	// Stop heartbeating before we record the outcome, so the lease is not being
 	// renewed underneath CompleteTask/FailTask as they release it.
@@ -207,13 +218,13 @@ func (w *Worker) heartbeat(ctx context.Context, task *store.ClaimedTask) {
 // runHandler invokes a handler and turns a panic into an ordinary error, so a
 // task that blows up is failed and retried like any other rather than taking the
 // whole worker process down with it.
-func runHandler(ctx context.Context, handler HandlerFunc, task store.ClaimedTask) (err error) {
+func runHandler(ctx context.Context, handler HandlerFunc, task store.ClaimedTask, log *TaskLogger) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("handler panicked: %v", r)
 		}
 	}()
-	return handler(ctx, task)
+	return handler(ctx, task, log)
 }
 
 // wait sleeps for d but returns early if ctx is cancelled, so a shutdown does

@@ -36,6 +36,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/workflows", s.handleListWorkflows)
 	mux.HandleFunc("GET /api/workflows/{id}", s.handleGetWorkflow)
 	mux.HandleFunc("POST /api/workflows/{id}/runs", s.handleTriggerRun)
+	mux.HandleFunc("GET /api/workflows/{id}/runs", s.handleListRuns)
 	mux.HandleFunc("GET /api/runs/{id}", s.handleGetRun)
 	mux.HandleFunc("GET /api/runs/{id}/tasks/{tid}", s.handleGetTask)
 	mux.HandleFunc("POST /api/runs/{id}/cancel", s.handleCancelRun)

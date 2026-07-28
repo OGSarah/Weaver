@@ -45,6 +45,31 @@ export function statusColors(status) {
 	return STATUS_COLORS[status] ?? UNKNOWN;
 }
 
+// breakdown turns a {status: count} map into ordered [status, count] pairs, using
+// the lifecycle order above and dropping statuses nothing is in.
+//
+// Any status the palette does not know about is kept and appended, so a state added
+// to the schema before it is added here still shows up in a total that adds up,
+// rather than silently going missing from a "2 of 4" that then looks wrong.
+export function breakdown(counts) {
+	if (!counts) return [];
+	const known = STATUS_ORDER.filter((s) => counts[s] > 0).map((s) => [s, counts[s]]);
+	const extra = Object.entries(counts)
+		.filter(([s, n]) => n > 0 && !STATUS_COLORS[s])
+		.sort(([a], [b]) => a.localeCompare(b));
+	return [...known, ...extra];
+}
+
+// countByStatus builds the same map from a run's task list, so the run view can
+// summarize itself without a second request shaped like the history endpoint's.
+export function countByStatus(tasks) {
+	const counts = {};
+	for (const t of tasks) {
+		counts[t.status] = (counts[t.status] ?? 0) + 1;
+	}
+	return counts;
+}
+
 // Run-level statuses that mean nothing further will change, so polling can stop.
 // Anything else (pending, running) is still in flight.
 const TERMINAL_RUN_STATUSES = new Set(["succeeded", "failed", "cancelled"]);

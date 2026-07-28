@@ -9,8 +9,10 @@ import (
 // HandlerFunc is the code a task runs. The name in a task's definition is looked
 // up in the Registry to find the matching function. The ctx carries
 // cancellation (Phase 5 uses it to enforce per-task timeouts); the task gives
-// the handler its identity, so an idempotent handler can key off RunID + ID.
-type HandlerFunc func(ctx context.Context, task store.ClaimedTask) error
+// the handler its identity, so an idempotent handler can key off RunID + ID; and
+// log is where it records what it did, durably enough to read back after the
+// worker that ran it is gone.
+type HandlerFunc func(ctx context.Context, task store.ClaimedTask, log *TaskLogger) error
 
 // Registry maps a handler name to the Go function that implements it. It is
 // populated once at startup and only read afterward, so it needs no locking.

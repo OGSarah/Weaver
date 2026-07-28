@@ -2,8 +2,9 @@ package store
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"weaver/internal/workflow"
@@ -11,6 +12,11 @@ import (
 )
 
 const defaultTimeoutSeconds = 300
+
+// maxRunHistory caps a single history page. History grows without bound on a
+// scheduled workflow, so an unbounded query would eventually try to return years of
+// it to a browser.
+const maxRunHistory = 50
 
 // TaskState is one task's runtime state within a run.
 type TaskState struct {
@@ -36,6 +42,89 @@ type RunState struct {
 	StartedAt  *time.Time
 	FinishedAt *time.Time
 	Tasks      []TaskState
+}
+
+// RunHistoryEntry is one row of a workflow's run history: enough to list and pick
+// a run without loading its tasks.
+type RunHistoryEntry struct {
+	ID              string
+	WorkflowVersion int
+	Status          string
+	CreatedAt       time.Time
+	StartedAt       *time.Time
+	FinishedAt      *time.Time
+	TaskCount       int
+	// TaskCounts is status -> how many of this run's tasks are in it. A map rather
+	// than a column per status, so adding a state to the schema does not mean
+	// changing this struct, the query, and the JSON shape in step. Statuses with no
+	// tasks are absent rather than zero.
+	TaskCounts map[string]int
+}
+
+// ListRunHistory returns the most recent runs for the workflow named by the given
+// id, newest first.
+//
+// It resolves that id to a workflow *name* and returns runs across every version of
+// it, rather than only the exact version passed in. Registering a workflow again
+// creates a new row with a new id, so scoping to one id would silently hide the
+// history the moment a definition was edited -- which is exactly when comparing
+// against previous runs is most useful. The version each run used comes back with
+// it, so the ones that ran a different definition are still identifiable.
+func (s *Store) ListRunHistory(ctx context.Context, workflowID string, limit int) ([]RunHistoryEntry, error) {
+	if limit <= 0 || limit > maxRunHistory {
+		limit = maxRunHistory
+	}
+
+	// The task counts come from one aggregate subquery rather than a join against
+	// the outer query, so a run with twenty tasks still produces exactly one row.
+	//
+	// The inner query groups by status and the outer one folds those groups into a
+	// single JSON object, which is what keeps this to one round trip: counting each
+	// status separately would mean either a column per status or a second query per
+	// run. A run whose tasks were all deleted yields no groups at all, so both
+	// aggregates are coalesced to an empty result rather than NULL.
+	rows, err := s.pool.Query(ctx,
+		`SELECT r.id, w.version, r.status, r.created_at, r.started_at, r.finished_at,
+		        coalesce(t.total, 0), coalesce(t.by_status, '{}'::jsonb)
+		   FROM runs r
+		   JOIN workflows w ON w.id = r.workflow_id
+		   LEFT JOIN LATERAL (
+		        SELECT coalesce(sum(g.n), 0)::int AS total,
+		               jsonb_object_agg(g.status, g.n) AS by_status
+		          FROM (
+		               SELECT status, count(*) AS n
+		                 FROM tasks
+		                WHERE run_id = r.id
+		                GROUP BY status
+		          ) g
+		   ) t ON true
+		  WHERE w.name = (SELECT name FROM workflows WHERE id = $1)
+		  ORDER BY r.created_at DESC
+		  LIMIT $2`,
+		workflowID, limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query run history: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]RunHistoryEntry, 0, limit)
+	for rows.Next() {
+		var e RunHistoryEntry
+		var byStatus []byte
+		if err := rows.Scan(&e.ID, &e.WorkflowVersion, &e.Status, &e.CreatedAt,
+			&e.StartedAt, &e.FinishedAt, &e.TaskCount, &byStatus); err != nil {
+			return nil, fmt.Errorf("scan run history: %w", err)
+		}
+		if err := json.Unmarshal(byStatus, &e.TaskCounts); err != nil {
+			return nil, fmt.Errorf("decode task counts: %w", err)
+		}
+		out = append(out, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate run history: %w", err)
+	}
+	return out, nil
 }
 
 // GetRunState returns a run, all of its tasks, and the dependency edges between

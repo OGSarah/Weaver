@@ -77,14 +77,30 @@ func workerID() string {
 // a worker has something to run before real task code exists. seedDemoRun uses
 // "demoTask"; the others match the example workflow in the README.
 func registerDemoHandlers(reg *worker.Registry) {
-	demo := func(ctx context.Context, task store.ClaimedTask) error {
+	demo := func(ctx context.Context, task store.ClaimedTask, tlog *worker.TaskLogger) error {
 		// Simulate work of a variable length so two workers visibly interleave.
 		d := time.Duration(200+rand.Intn(800)) * time.Millisecond
+		tlog.Printf("handler %q starting, simulating %s of work", task.Handler, d)
+
+		// Log partway through as well, so a task caught mid-flight in the UI has
+		// something in its panel rather than only lines written at the end.
+		half := d / 2
 		select {
 		case <-ctx.Done():
+			tlog.Errorf("cancelled after %s: %v", half, ctx.Err())
 			return ctx.Err()
-		case <-time.After(d):
+		case <-time.After(half):
 		}
+		tlog.Printf("halfway through")
+
+		select {
+		case <-ctx.Done():
+			tlog.Errorf("cancelled: %v", ctx.Err())
+			return ctx.Err()
+		case <-time.After(d - half):
+		}
+
+		tlog.Printf("finished in %s", d)
 		log.Printf("handler %q ran task %s (run %s) in %s", task.Handler, task.Name, task.RunID, d)
 		return nil
 	}

@@ -1333,7 +1333,7 @@
           return dispatcher;
         }
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-        var React3 = require_react(), Internals = {
+        var React4 = require_react(), Internals = {
           d: {
             f: noop,
             r: function() {
@@ -1351,7 +1351,7 @@
           },
           p: 0,
           findDOMNode: null
-        }, REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), ReactSharedInternals = React3.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
+        }, REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), ReactSharedInternals = React4.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE;
         "function" === typeof Map && null != Map.prototype && "function" === typeof Map.prototype.forEach && "function" === typeof Set && null != Set.prototype && "function" === typeof Set.prototype.clear && "function" === typeof Set.prototype.forEach || console.error(
           "React depends on Map and Set built-in types. Make sure that you load a polyfill in older browsers. https://reactjs.org/link/react-polyfills"
         );
@@ -2886,7 +2886,7 @@
           "number" === type && getActiveElement(node.ownerDocument) === node || node.defaultValue === "" + value || (node.defaultValue = "" + value);
         }
         function validateOptionProps(element, props) {
-          null == props.value && ("object" === typeof props.children && null !== props.children ? React3.Children.forEach(props.children, function(child) {
+          null == props.value && ("object" === typeof props.children && null !== props.children ? React4.Children.forEach(props.children, function(child) {
             null == child || "string" === typeof child || "number" === typeof child || "bigint" === typeof child || didWarnInvalidChild || (didWarnInvalidChild = true, console.error(
               "Cannot infer the option value of complex children. Pass a `value` prop or use a plain string as children to <option>."
             ));
@@ -3491,28 +3491,28 @@
           ))));
           null == value || "boolean" === typeof value || "" === value ? isCustomProperty ? style2.setProperty(styleName, "") : "float" === styleName ? style2.cssFloat = "" : style2[styleName] = "" : isCustomProperty ? style2.setProperty(styleName, value) : "number" !== typeof value || 0 === value || unitlessNumbers.has(styleName) ? "float" === styleName ? style2.cssFloat = value : (checkCSSPropertyStringCoercion(value, styleName), style2[styleName] = ("" + value).trim()) : style2[styleName] = value + "px";
         }
-        function setValueForStyles(node, styles3, prevStyles) {
-          if (null != styles3 && "object" !== typeof styles3)
+        function setValueForStyles(node, styles4, prevStyles) {
+          if (null != styles4 && "object" !== typeof styles4)
             throw Error(
               "The `style` prop expects a mapping from style properties to values, not a string. For example, style={{marginRight: spacing + 'em'}} when using JSX."
             );
-          styles3 && Object.freeze(styles3);
+          styles4 && Object.freeze(styles4);
           node = node.style;
           if (null != prevStyles) {
-            if (styles3) {
+            if (styles4) {
               var expandedUpdates = {};
               if (prevStyles) {
                 for (var key in prevStyles)
-                  if (prevStyles.hasOwnProperty(key) && !styles3.hasOwnProperty(key))
+                  if (prevStyles.hasOwnProperty(key) && !styles4.hasOwnProperty(key))
                     for (var longhands = shorthandToLonghand[key] || [key], i = 0; i < longhands.length; i++)
                       expandedUpdates[longhands[i]] = key;
               }
-              for (var _key in styles3)
-                if (styles3.hasOwnProperty(_key) && (!prevStyles || prevStyles[_key] !== styles3[_key]))
+              for (var _key in styles4)
+                if (styles4.hasOwnProperty(_key) && (!prevStyles || prevStyles[_key] !== styles4[_key]))
                   for (key = shorthandToLonghand[_key] || [_key], longhands = 0; longhands < key.length; longhands++)
                     expandedUpdates[key[longhands]] = _key;
               _key = {};
-              for (var key$jscomp$0 in styles3)
+              for (var key$jscomp$0 in styles4)
                 for (key = shorthandToLonghand[key$jscomp$0] || [key$jscomp$0], longhands = 0; longhands < key.length; longhands++)
                   _key[key[longhands]] = key$jscomp$0;
               key$jscomp$0 = {};
@@ -3520,7 +3520,7 @@
                 if (key = expandedUpdates[_key2], (longhands = _key[_key2]) && key !== longhands && (i = key + "," + longhands, !key$jscomp$0[i])) {
                   key$jscomp$0[i] = true;
                   i = console;
-                  var value = styles3[key];
+                  var value = styles4[key];
                   i.error.call(
                     i,
                     "%s a style property during rerender (%s) when a conflicting property is set (%s) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.",
@@ -3531,12 +3531,12 @@
                 }
             }
             for (var styleName in prevStyles)
-              !prevStyles.hasOwnProperty(styleName) || null != styles3 && styles3.hasOwnProperty(styleName) || (0 === styleName.indexOf("--") ? node.setProperty(styleName, "") : "float" === styleName ? node.cssFloat = "" : node[styleName] = "");
-            for (var _styleName in styles3)
-              _key2 = styles3[_styleName], styles3.hasOwnProperty(_styleName) && prevStyles[_styleName] !== _key2 && setValueForStyle(node, _styleName, _key2);
+              !prevStyles.hasOwnProperty(styleName) || null != styles4 && styles4.hasOwnProperty(styleName) || (0 === styleName.indexOf("--") ? node.setProperty(styleName, "") : "float" === styleName ? node.cssFloat = "" : node[styleName] = "");
+            for (var _styleName in styles4)
+              _key2 = styles4[_styleName], styles4.hasOwnProperty(_styleName) && prevStyles[_styleName] !== _key2 && setValueForStyle(node, _styleName, _key2);
           } else
-            for (expandedUpdates in styles3)
-              styles3.hasOwnProperty(expandedUpdates) && setValueForStyle(node, expandedUpdates, styles3[expandedUpdates]);
+            for (expandedUpdates in styles4)
+              styles4.hasOwnProperty(expandedUpdates) && setValueForStyle(node, expandedUpdates, styles4[expandedUpdates]);
         }
         function isCustomElement(tagName) {
           if (-1 === tagName.indexOf("-")) return false;
@@ -17061,15 +17061,15 @@
         function estimateBandwidth() {
           if ("function" === typeof performance.getEntriesByType) {
             for (var count = 0, bits = 0, resourceEntries = performance.getEntriesByType("resource"), i = 0; i < resourceEntries.length; i++) {
-              var entry = resourceEntries[i], transferSize = entry.transferSize, initiatorType = entry.initiatorType, duration = entry.duration;
-              if (transferSize && duration && isLikelyStaticResource(initiatorType)) {
+              var entry = resourceEntries[i], transferSize = entry.transferSize, initiatorType = entry.initiatorType, duration2 = entry.duration;
+              if (transferSize && duration2 && isLikelyStaticResource(initiatorType)) {
                 initiatorType = 0;
-                duration = entry.responseEnd;
+                duration2 = entry.responseEnd;
                 for (i += 1; i < resourceEntries.length; i++) {
                   var overlapEntry = resourceEntries[i], overlapStartTime = overlapEntry.startTime;
-                  if (overlapStartTime > duration) break;
+                  if (overlapStartTime > duration2) break;
                   var overlapTransferSize = overlapEntry.transferSize, overlapInitiatorType = overlapEntry.initiatorType;
-                  overlapTransferSize && isLikelyStaticResource(overlapInitiatorType) && (overlapEntry = overlapEntry.responseEnd, initiatorType += overlapTransferSize * (overlapEntry < duration ? 1 : (duration - overlapStartTime) / (overlapEntry - overlapStartTime)));
+                  overlapTransferSize && isLikelyStaticResource(overlapInitiatorType) && (overlapEntry = overlapEntry.responseEnd, initiatorType += overlapTransferSize * (overlapEntry < duration2 ? 1 : (duration2 - overlapStartTime) / (overlapEntry - overlapStartTime)));
                 }
                 --i;
                 bits += 8 * (transferSize + initiatorType) / (entry.duration / 1e3);
@@ -18518,14 +18518,14 @@
           ));
         }
         "undefined" !== typeof __REACT_DEVTOOLS_GLOBAL_HOOK__ && "function" === typeof __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart && __REACT_DEVTOOLS_GLOBAL_HOOK__.registerInternalModuleStart(Error());
-        var Scheduler = require_scheduler(), React3 = require_react(), ReactDOM = require_react_dom(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.element"), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy");
+        var Scheduler = require_scheduler(), React4 = require_react(), ReactDOM = require_react_dom(), assign = Object.assign, REACT_LEGACY_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.element"), REACT_ELEMENT_TYPE = /* @__PURE__ */ Symbol.for("react.transitional.element"), REACT_PORTAL_TYPE = /* @__PURE__ */ Symbol.for("react.portal"), REACT_FRAGMENT_TYPE = /* @__PURE__ */ Symbol.for("react.fragment"), REACT_STRICT_MODE_TYPE = /* @__PURE__ */ Symbol.for("react.strict_mode"), REACT_PROFILER_TYPE = /* @__PURE__ */ Symbol.for("react.profiler"), REACT_CONSUMER_TYPE = /* @__PURE__ */ Symbol.for("react.consumer"), REACT_CONTEXT_TYPE = /* @__PURE__ */ Symbol.for("react.context"), REACT_FORWARD_REF_TYPE = /* @__PURE__ */ Symbol.for("react.forward_ref"), REACT_SUSPENSE_TYPE = /* @__PURE__ */ Symbol.for("react.suspense"), REACT_SUSPENSE_LIST_TYPE = /* @__PURE__ */ Symbol.for("react.suspense_list"), REACT_MEMO_TYPE = /* @__PURE__ */ Symbol.for("react.memo"), REACT_LAZY_TYPE = /* @__PURE__ */ Symbol.for("react.lazy");
         /* @__PURE__ */ Symbol.for("react.scope");
         var REACT_ACTIVITY_TYPE = /* @__PURE__ */ Symbol.for("react.activity");
         /* @__PURE__ */ Symbol.for("react.legacy_hidden");
         /* @__PURE__ */ Symbol.for("react.tracing_marker");
         var REACT_MEMO_CACHE_SENTINEL = /* @__PURE__ */ Symbol.for("react.memo_cache_sentinel");
         /* @__PURE__ */ Symbol.for("react.view_transition");
-        var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React3.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
+        var MAYBE_ITERATOR_SYMBOL = Symbol.iterator, REACT_CLIENT_REFERENCE = /* @__PURE__ */ Symbol.for("react.client.reference"), isArrayImpl = Array.isArray, ReactSharedInternals = React4.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, ReactDOMSharedInternals = ReactDOM.__DOM_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE, NotPending = Object.freeze({
           pending: false,
           data: null,
           method: null,
@@ -21149,9 +21149,9 @@
             previousDispatcher.S(href, precedence, options);
             var ownerDocument = globalDocument;
             if (ownerDocument && href) {
-              var styles3 = getResourcesFromRoot(ownerDocument).hoistableStyles, key = getStyleKey(href);
+              var styles4 = getResourcesFromRoot(ownerDocument).hoistableStyles, key = getStyleKey(href);
               precedence = precedence || "default";
-              var resource = styles3.get(key);
+              var resource = styles4.get(key);
               if (!resource) {
                 var state = { loading: NotLoaded, preload: null };
                 if (resource = ownerDocument.querySelector(
@@ -21190,7 +21190,7 @@
                   count: 1,
                   state
                 };
-                styles3.set(key, resource);
+                styles4.set(key, resource);
               }
             }
           },
@@ -21313,7 +21313,7 @@
           }
         };
         (function() {
-          var isomorphicReactPackageVersion = React3.version;
+          var isomorphicReactPackageVersion = React4.version;
           if ("19.2.8" !== isomorphicReactPackageVersion)
             throw Error(
               'Incompatible React versions: The "react" and "react-dom" packages must have the exact same version. Instead got:\n  - react:      ' + (isomorphicReactPackageVersion + "\n  - react-dom:  19.2.8\nLearn more: https://react.dev/warnings/version-mismatch")
@@ -21454,7 +21454,7 @@
   });
 
   // src/main.jsx
-  var import_react2 = __toESM(require_react(), 1);
+  var import_react3 = __toESM(require_react(), 1);
   var import_client = __toESM(require_client(), 1);
 
   // src/Dag.jsx
@@ -23180,6 +23180,19 @@
   function statusColors(status) {
     return STATUS_COLORS[status] ?? UNKNOWN;
   }
+  function breakdown(counts) {
+    if (!counts) return [];
+    const known = STATUS_ORDER.filter((s) => counts[s] > 0).map((s) => [s, counts[s]]);
+    const extra = Object.entries(counts).filter(([s, n]) => n > 0 && !STATUS_COLORS[s]).sort(([a], [b]) => a.localeCompare(b));
+    return [...known, ...extra];
+  }
+  function countByStatus(tasks) {
+    const counts = {};
+    for (const t of tasks) {
+      counts[t.status] = (counts[t.status] ?? 0) + 1;
+    }
+    return counts;
+  }
   var TERMINAL_RUN_STATUSES = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled"]);
   function isRunFinished(status) {
     return TERMINAL_RUN_STATUSES.has(status);
@@ -23190,7 +23203,7 @@
   var EDGE_COLOR = "#94a3b8";
   var ROOT_COLOR = "#6366f1";
   var NODE_BORDER = "#cbd5e1";
-  function Dag({ tasks }) {
+  function Dag({ tasks, selectedId, onSelect }) {
     const topologyKey = (0, import_react.useMemo)(
       () => tasks.map((t) => `${t.id}:${(t.dependsOn ?? []).join(",")}`).join("|"),
       [tasks]
@@ -23233,10 +23246,19 @@
           markerEnd: "url(#arrowhead)"
         }
       ))),
-      /* @__PURE__ */ import_react.default.createElement("g", null, nodes.map((n) => /* @__PURE__ */ import_react.default.createElement(TaskNode, { key: n.id, node: n, task: currentById.get(n.id) })))
+      /* @__PURE__ */ import_react.default.createElement("g", null, nodes.map((n) => /* @__PURE__ */ import_react.default.createElement(
+        TaskNode,
+        {
+          key: n.id,
+          node: n,
+          task: currentById.get(n.id),
+          selected: n.id === selectedId,
+          onSelect
+        }
+      )))
     ));
   }
-  function TaskNode({ node, task }) {
+  function TaskNode({ node, task, selected, onSelect }) {
     const { x: x2, y, width, height } = node;
     if (!task) {
       return null;
@@ -23249,51 +23271,83 @@
     const strokeWidth = colors ? 2 : isRoot ? 2 : 1.5;
     const sublabel = status ?? task.handler;
     const showAttempt = (task.attempt ?? 0) > 1;
-    return /* @__PURE__ */ import_react.default.createElement("g", null, /* @__PURE__ */ import_react.default.createElement(
-      "rect",
+    return /* @__PURE__ */ import_react.default.createElement(
+      "g",
       {
-        x: x2,
-        y,
-        width,
-        height,
-        rx: NODE_RADIUS,
-        fill,
-        stroke,
-        strokeWidth,
-        strokeDasharray: status === "cancelled" ? "4 3" : void 0
+        onClick: onSelect ? () => onSelect(task.id) : void 0,
+        style: onSelect ? { cursor: "pointer" } : void 0,
+        tabIndex: onSelect ? 0 : void 0,
+        role: onSelect ? "button" : void 0,
+        onKeyDown: onSelect ? (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect(task.id);
+          }
+        } : void 0
       },
-      status === "running" && /* @__PURE__ */ import_react.default.createElement(
-        "animate",
+      selected && /* @__PURE__ */ import_react.default.createElement(
+        "rect",
         {
-          attributeName: "stroke-opacity",
-          values: "1;0.3;1",
-          dur: "1.4s",
-          repeatCount: "indefinite"
+          x: x2 - 4,
+          y: y - 4,
+          width: width + 8,
+          height: height + 8,
+          rx: NODE_RADIUS + 3,
+          fill: "none",
+          stroke: "#4f46e5",
+          strokeWidth: "2"
         }
-      )
-    ), /* @__PURE__ */ import_react.default.createElement(
-      "text",
-      {
-        x: x2 + width / 2,
-        y: y + 22,
-        textAnchor: "middle",
-        fontSize: "13",
-        fontWeight: "600",
-        fill: "#0f172a"
-      },
-      task.id
-    ), /* @__PURE__ */ import_react.default.createElement(
-      "text",
-      {
-        x: x2 + width / 2,
-        y: y + 40,
-        textAnchor: "middle",
-        fontSize: "11",
-        fontWeight: status ? 600 : 400,
-        fill: colors ? colors.text : "#64748b"
-      },
-      sublabel
-    ), showAttempt && /* @__PURE__ */ import_react.default.createElement("text", { x: x2 + width - 8, y: y + 14, textAnchor: "end", fontSize: "9", fill: "#94a3b8" }, "try ", task.attempt, "/", task.maxAttempts), task.error && /* @__PURE__ */ import_react.default.createElement("title", null, task.error));
+      ),
+      /* @__PURE__ */ import_react.default.createElement(
+        "rect",
+        {
+          x: x2,
+          y,
+          width,
+          height,
+          rx: NODE_RADIUS,
+          fill,
+          stroke,
+          strokeWidth,
+          strokeDasharray: status === "cancelled" ? "4 3" : void 0
+        },
+        status === "running" && /* @__PURE__ */ import_react.default.createElement(
+          "animate",
+          {
+            attributeName: "stroke-opacity",
+            values: "1;0.3;1",
+            dur: "1.4s",
+            repeatCount: "indefinite"
+          }
+        )
+      ),
+      /* @__PURE__ */ import_react.default.createElement(
+        "text",
+        {
+          x: x2 + width / 2,
+          y: y + 22,
+          textAnchor: "middle",
+          fontSize: "13",
+          fontWeight: "600",
+          fill: "#0f172a"
+        },
+        task.id
+      ),
+      /* @__PURE__ */ import_react.default.createElement(
+        "text",
+        {
+          x: x2 + width / 2,
+          y: y + 40,
+          textAnchor: "middle",
+          fontSize: "11",
+          fontWeight: status ? 600 : 400,
+          fill: colors ? colors.text : "#64748b"
+        },
+        sublabel
+      ),
+      showAttempt && /* @__PURE__ */ import_react.default.createElement("text", { x: x2 + width - 8, y: y + 14, textAnchor: "end", fontSize: "9", fill: "#94a3b8" }, "try ", task.attempt, "/", task.maxAttempts),
+      task.error && /* @__PURE__ */ import_react.default.createElement("title", null, task.error)
+    );
   }
   function StatusLegend() {
     return /* @__PURE__ */ import_react.default.createElement("ul", { style: styles.legend }, STATUS_ORDER.map((status) => {
@@ -23348,6 +23402,150 @@
     }
   };
 
+  // src/TaskPanel.jsx
+  var import_react2 = __toESM(require_react(), 1);
+  function TaskPanel({ task, loading, onClose }) {
+    return /* @__PURE__ */ import_react2.default.createElement("aside", { style: styles2.panel }, /* @__PURE__ */ import_react2.default.createElement("header", { style: styles2.header }, /* @__PURE__ */ import_react2.default.createElement("strong", { style: styles2.title }, task ? task.name : "Task"), /* @__PURE__ */ import_react2.default.createElement("button", { onClick: onClose, style: styles2.close, "aria-label": "Close task panel" }, "\xD7")), !task ? /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.muted }, loading ? "Loading\u2026" : "No task selected.") : /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.body }, /* @__PURE__ */ import_react2.default.createElement(Facts, { task }), task.error && /* @__PURE__ */ import_react2.default.createElement("section", null, /* @__PURE__ */ import_react2.default.createElement("h3", { style: styles2.sectionTitle }, "Error"), /* @__PURE__ */ import_react2.default.createElement("pre", { style: styles2.error }, task.error)), task.result && /* @__PURE__ */ import_react2.default.createElement("section", null, /* @__PURE__ */ import_react2.default.createElement("h3", { style: styles2.sectionTitle }, "Result"), /* @__PURE__ */ import_react2.default.createElement("pre", { style: styles2.code }, JSON.stringify(task.result, null, 2))), /* @__PURE__ */ import_react2.default.createElement(LogView, { logs: task.logs, truncated: task.logsTruncated })));
+  }
+  function Facts({ task }) {
+    const c = statusColors(task.status);
+    return /* @__PURE__ */ import_react2.default.createElement("dl", { style: styles2.facts }, /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Status" }, /* @__PURE__ */ import_react2.default.createElement(
+      "span",
+      {
+        style: { ...styles2.pill, background: c.fill, borderColor: c.stroke, color: c.text }
+      },
+      task.status
+    )), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Handler" }, /* @__PURE__ */ import_react2.default.createElement("code", null, task.handler)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Attempt" }, task.attempt, " of ", task.maxAttempts), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Timeout" }, task.timeoutSeconds, "s"), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Scheduled" }, formatTime(task.scheduledAt)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Started" }, formatTime(task.startedAt)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Finished" }, formatTime(task.finishedAt)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Duration" }, duration(task.startedAt, task.finishedAt)));
+  }
+  function Fact({ label, children }) {
+    return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("dt", { style: styles2.factLabel }, label), /* @__PURE__ */ import_react2.default.createElement("dd", { style: styles2.factValue }, children));
+  }
+  function LogView({ logs, truncated }) {
+    if (!logs || logs.length === 0) {
+      return /* @__PURE__ */ import_react2.default.createElement("section", null, /* @__PURE__ */ import_react2.default.createElement("h3", { style: styles2.sectionTitle }, "Log"), /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.muted }, "No log lines yet."));
+    }
+    const groups = [];
+    for (const line of logs) {
+      const last = groups[groups.length - 1];
+      if (!last || last.attempt !== line.attempt) {
+        groups.push({ attempt: line.attempt, lines: [line] });
+      } else {
+        last.lines.push(line);
+      }
+    }
+    return /* @__PURE__ */ import_react2.default.createElement("section", null, /* @__PURE__ */ import_react2.default.createElement("h3", { style: styles2.sectionTitle }, "Log"), truncated && /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.truncated }, "Older lines omitted; showing the most recent only."), groups.map((g) => /* @__PURE__ */ import_react2.default.createElement("div", { key: g.attempt, style: styles2.attemptGroup }, /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.attemptLabel }, "attempt ", g.attempt), /* @__PURE__ */ import_react2.default.createElement("ol", { style: styles2.log }, g.lines.map((line, i) => /* @__PURE__ */ import_react2.default.createElement("li", { key: i, style: styles2.logLine }, /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.logTime }, formatClock(line.loggedAt)), /* @__PURE__ */ import_react2.default.createElement("span", { style: line.level === "error" ? styles2.logError : void 0 }, line.message)))))));
+  }
+  function formatTime(iso) {
+    if (!iso) return /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.muted }, "\u2014");
+    return new Date(iso).toLocaleString();
+  }
+  function formatClock(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleTimeString(void 0, { hour12: false }) + "." + String(d.getMilliseconds()).padStart(3, "0");
+  }
+  function duration(startedAt, finishedAt) {
+    if (!startedAt) return /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.muted }, "\u2014");
+    const start = new Date(startedAt).getTime();
+    const end = finishedAt ? new Date(finishedAt).getTime() : Date.now();
+    const ms = end - start;
+    const text = ms < 1e3 ? `${ms}ms` : `${(ms / 1e3).toFixed(1)}s`;
+    return finishedAt ? text : `${text} (running)`;
+  }
+  var styles2 = {
+    panel: {
+      width: 360,
+      borderLeft: "1px solid #e2e8f0",
+      display: "flex",
+      flexDirection: "column",
+      minHeight: 0,
+      background: "#ffffff"
+    },
+    header: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "10px 14px",
+      borderBottom: "1px solid #e2e8f0"
+    },
+    title: { flex: 1, fontSize: 14 },
+    close: {
+      border: "none",
+      background: "none",
+      fontSize: 20,
+      lineHeight: 1,
+      cursor: "pointer",
+      color: "#64748b",
+      padding: 0
+    },
+    // The panel scrolls on its own; a long log must not stretch the page.
+    body: { overflowY: "auto", padding: "12px 14px", fontSize: 13 },
+    facts: {
+      display: "grid",
+      gridTemplateColumns: "auto 1fr",
+      gap: "4px 12px",
+      margin: "0 0 14px",
+      alignItems: "baseline"
+    },
+    factLabel: { color: "#64748b", fontSize: 12 },
+    factValue: { margin: 0, wordBreak: "break-word" },
+    pill: {
+      fontSize: 11,
+      fontWeight: 600,
+      padding: "1px 8px",
+      borderRadius: 999,
+      borderWidth: 1,
+      borderStyle: "solid"
+    },
+    sectionTitle: {
+      fontSize: 11,
+      textTransform: "uppercase",
+      letterSpacing: "0.06em",
+      color: "#64748b",
+      margin: "0 0 6px"
+    },
+    error: {
+      margin: "0 0 14px",
+      padding: 8,
+      background: "#fef2f2",
+      color: "#b91c1c",
+      borderRadius: 4,
+      fontSize: 12,
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word"
+    },
+    code: {
+      margin: "0 0 14px",
+      padding: 8,
+      background: "#f8fafc",
+      borderRadius: 4,
+      fontSize: 12,
+      overflowX: "auto"
+    },
+    attemptGroup: { marginBottom: 10 },
+    attemptLabel: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: "#475569",
+      borderTop: "1px solid #e2e8f0",
+      paddingTop: 4,
+      marginBottom: 2
+    },
+    log: { listStyle: "none", margin: 0, padding: 0 },
+    logLine: {
+      display: "flex",
+      gap: 8,
+      fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+      fontSize: 11,
+      lineHeight: 1.6,
+      wordBreak: "break-word"
+    },
+    logTime: { color: "#94a3b8", flexShrink: 0 },
+    logError: { color: "#b91c1c" },
+    truncated: { fontSize: 11, color: "#b45309", margin: "0 0 6px" },
+    muted: { color: "#64748b", padding: "0 0 8px" }
+  };
+
   // src/main.jsx
   var POLL_MS = 1e3;
   async function getJSON(path, { signal, method = "GET" } = {}) {
@@ -23364,15 +23562,19 @@
     return res.json();
   }
   function App() {
-    const [workflows, setWorkflows] = (0, import_react2.useState)([]);
-    const [selectedId, setSelectedId] = (0, import_react2.useState)(null);
-    const [detail, setDetail] = (0, import_react2.useState)(null);
-    const [runId, setRunId] = (0, import_react2.useState)(null);
-    const [run, setRun] = (0, import_react2.useState)(null);
-    const [error, setError] = (0, import_react2.useState)(null);
-    const [loading, setLoading] = (0, import_react2.useState)(true);
-    const [triggering, setTriggering] = (0, import_react2.useState)(false);
-    (0, import_react2.useEffect)(() => {
+    const [workflows, setWorkflows] = (0, import_react3.useState)([]);
+    const [selectedId, setSelectedId] = (0, import_react3.useState)(null);
+    const [detail, setDetail] = (0, import_react3.useState)(null);
+    const [history, setHistory] = (0, import_react3.useState)([]);
+    const [historyNonce, setHistoryNonce] = (0, import_react3.useState)(0);
+    const [runId, setRunId] = (0, import_react3.useState)(null);
+    const [run, setRun] = (0, import_react3.useState)(null);
+    const [selectedTaskName, setSelectedTaskName] = (0, import_react3.useState)(null);
+    const [taskDetail, setTaskDetail] = (0, import_react3.useState)(null);
+    const [error, setError] = (0, import_react3.useState)(null);
+    const [loading, setLoading] = (0, import_react3.useState)(true);
+    const [triggering, setTriggering] = (0, import_react3.useState)(false);
+    (0, import_react3.useEffect)(() => {
       const controller = new AbortController();
       getJSON("/api/workflows", { signal: controller.signal }).then((data) => {
         setWorkflows(data);
@@ -23387,19 +23589,29 @@
       });
       return () => controller.abort();
     }, []);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react3.useEffect)(() => {
       if (!selectedId) return;
       const controller = new AbortController();
       setDetail(null);
       setRunId(null);
       setRun(null);
+      setSelectedTaskName(null);
       getJSON(`/api/workflows/${selectedId}`, { signal: controller.signal }).then(setDetail).catch((err) => {
         if (err.name === "AbortError") return;
         setError(err.message);
       });
       return () => controller.abort();
     }, [selectedId]);
-    (0, import_react2.useEffect)(() => {
+    (0, import_react3.useEffect)(() => {
+      if (!selectedId) return;
+      const controller = new AbortController();
+      getJSON(`/api/workflows/${selectedId}/runs`, { signal: controller.signal }).then(setHistory).catch((err) => {
+        if (err.name === "AbortError") return;
+        setError(err.message);
+      });
+      return () => controller.abort();
+    }, [selectedId, historyNonce]);
+    (0, import_react3.useEffect)(() => {
       if (!runId) return;
       const controller = new AbortController();
       let stopped = false;
@@ -23411,6 +23623,8 @@
           setRun(data);
           if (!isRunFinished(data.status)) {
             timer = setTimeout(poll, POLL_MS);
+          } else {
+            setHistoryNonce((n) => n + 1);
           }
         } catch (err) {
           if (stopped || err.name === "AbortError") return;
@@ -23424,23 +23638,7 @@
         clearTimeout(timer);
       };
     }, [runId]);
-    const triggerRun = (0, import_react2.useCallback)(async () => {
-      if (!selectedId) return;
-      setTriggering(true);
-      setError(null);
-      try {
-        const { runId: id } = await getJSON(`/api/workflows/${selectedId}/runs`, {
-          method: "POST"
-        });
-        setRun(null);
-        setRunId(id);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setTriggering(false);
-      }
-    }, [selectedId]);
-    const runTasks = (0, import_react2.useMemo)(() => {
+    const runTasks = (0, import_react3.useMemo)(() => {
       if (!run) return null;
       return run.tasks.map((t) => ({
         id: t.name,
@@ -23452,52 +23650,176 @@
         error: t.error
       }));
     }, [run]);
+    const selectedTaskId = (0, import_react3.useMemo)(() => {
+      if (!run || !selectedTaskName) return null;
+      return run.tasks.find((t) => t.name === selectedTaskName)?.id ?? null;
+    }, [run, selectedTaskName]);
+    (0, import_react3.useEffect)(() => {
+      if (!runId || !selectedTaskId) {
+        setTaskDetail(null);
+        return;
+      }
+      const controller = new AbortController();
+      getJSON(`/api/runs/${runId}/tasks/${selectedTaskId}`, { signal: controller.signal }).then(setTaskDetail).catch((err) => {
+        if (err.name === "AbortError") return;
+        setError(err.message);
+      });
+      return () => controller.abort();
+    }, [runId, selectedTaskId, run]);
+    const triggerRun = (0, import_react3.useCallback)(async () => {
+      if (!selectedId) return;
+      setTriggering(true);
+      setError(null);
+      try {
+        const { runId: id } = await getJSON(`/api/workflows/${selectedId}/runs`, {
+          method: "POST"
+        });
+        setRun(null);
+        setSelectedTaskName(null);
+        setRunId(id);
+        setHistoryNonce((n) => n + 1);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setTriggering(false);
+      }
+    }, [selectedId]);
+    const openRun = (0, import_react3.useCallback)((id) => {
+      setRun(null);
+      setSelectedTaskName(null);
+      setRunId(id);
+    }, []);
     if (loading) {
-      return /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.notice }, "Loading\u2026");
+      return /* @__PURE__ */ import_react3.default.createElement("p", { style: styles3.notice }, "Loading\u2026");
     }
     const showingRun = Boolean(runId);
     const tasks = showingRun ? runTasks : detail?.tasks;
-    return /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.page }, /* @__PURE__ */ import_react2.default.createElement("header", { style: styles2.header }, /* @__PURE__ */ import_react2.default.createElement("h1", { style: styles2.title }, "Weaver")), error && /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.errorBar }, error, /* @__PURE__ */ import_react2.default.createElement("button", { onClick: () => setError(null), style: styles2.dismiss }, "dismiss")), /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.body }, /* @__PURE__ */ import_react2.default.createElement("nav", { style: styles2.sidebar }, /* @__PURE__ */ import_react2.default.createElement("h2", { style: styles2.sidebarTitle }, "Workflows"), workflows.length === 0 && /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.hint }, "No workflows registered. POST one to ", /* @__PURE__ */ import_react2.default.createElement("code", null, "/api/workflows"), "."), /* @__PURE__ */ import_react2.default.createElement("ul", { style: styles2.list }, workflows.map((wf) => /* @__PURE__ */ import_react2.default.createElement("li", { key: wf.id }, /* @__PURE__ */ import_react2.default.createElement(
+    return /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.page }, /* @__PURE__ */ import_react3.default.createElement("header", { style: styles3.header }, /* @__PURE__ */ import_react3.default.createElement("h1", { style: styles3.title }, "Weaver")), error && /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.errorBar }, error, /* @__PURE__ */ import_react3.default.createElement("button", { onClick: () => setError(null), style: styles3.dismiss }, "dismiss")), /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.body }, /* @__PURE__ */ import_react3.default.createElement("nav", { style: styles3.sidebar }, /* @__PURE__ */ import_react3.default.createElement("section", { style: styles3.sidebarScroll }, /* @__PURE__ */ import_react3.default.createElement("h2", { style: styles3.sidebarTitle }, "Workflows"), workflows.length === 0 && /* @__PURE__ */ import_react3.default.createElement("p", { style: styles3.hint }, "No workflows registered. POST one to ", /* @__PURE__ */ import_react3.default.createElement("code", null, "/api/workflows"), "."), /* @__PURE__ */ import_react3.default.createElement("ul", { style: styles3.list }, workflows.map((wf) => /* @__PURE__ */ import_react3.default.createElement("li", { key: wf.id }, /* @__PURE__ */ import_react3.default.createElement(
       "button",
       {
         onClick: () => setSelectedId(wf.id),
         style: {
-          ...styles2.listButton,
-          ...wf.id === selectedId ? styles2.listButtonActive : null
+          ...styles3.listButton,
+          ...wf.id === selectedId ? styles3.listButtonActive : null
         }
       },
-      /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfName }, wf.name),
-      /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfMeta }, "v", wf.version, wf.schedule ? ` \xB7 ${wf.schedule}` : "")
-    ))))), /* @__PURE__ */ import_react2.default.createElement("main", { style: styles2.canvas }, detail ? /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.canvasHeader }, /* @__PURE__ */ import_react2.default.createElement("strong", null, detail.name), showingRun ? /* @__PURE__ */ import_react2.default.createElement(RunSummary, { run }) : /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfMeta }, detail.tasks.length, " task", detail.tasks.length === 1 ? "" : "s"), /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.spacer }), showingRun && /* @__PURE__ */ import_react2.default.createElement(
+      /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfName }, wf.name),
+      /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfMeta }, "v", wf.version, wf.schedule ? ` \xB7 ${wf.schedule}` : "")
+    ))))), /* @__PURE__ */ import_react3.default.createElement("section", { style: styles3.sidebarHistory }, /* @__PURE__ */ import_react3.default.createElement("h2", { style: styles3.sidebarTitle }, "Run history"), /* @__PURE__ */ import_react3.default.createElement(
+      RunHistory,
+      {
+        runs: history,
+        openRunId: runId,
+        onOpen: openRun,
+        latestVersion: detail?.version,
+        openRunLive: run ? { status: run.status, counts: countByStatus(run.tasks) } : null
+      }
+    ))), /* @__PURE__ */ import_react3.default.createElement("main", { style: styles3.canvas }, detail ? /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.canvasHeader }, /* @__PURE__ */ import_react3.default.createElement("strong", null, detail.name), showingRun ? /* @__PURE__ */ import_react3.default.createElement(RunSummary, { run }) : /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfMeta }, detail.tasks.length, " task", detail.tasks.length === 1 ? "" : "s"), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.spacer }), showingRun && /* @__PURE__ */ import_react3.default.createElement(
       "button",
       {
         onClick: () => {
           setRunId(null);
           setRun(null);
+          setSelectedTaskName(null);
         },
-        style: styles2.secondaryButton
+        style: styles3.secondaryButton
       },
       "Back to definition"
-    ), /* @__PURE__ */ import_react2.default.createElement(
+    ), /* @__PURE__ */ import_react3.default.createElement(
       "button",
       {
         onClick: triggerRun,
         disabled: triggering,
-        style: styles2.primaryButton
+        style: styles3.primaryButton
       },
       triggering ? "Triggering\u2026" : "Trigger run"
-    )), /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.canvasBody }, tasks ? /* @__PURE__ */ import_react2.default.createElement(Dag, { tasks }) : /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.notice }, "Waiting for the run to appear\u2026")), showingRun && /* @__PURE__ */ import_react2.default.createElement(StatusLegend, null)) : /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.notice }, selectedId ? "Loading graph\u2026" : "Select a workflow."))));
+    )), /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.canvasBody }, tasks ? /* @__PURE__ */ import_react3.default.createElement(
+      Dag,
+      {
+        tasks,
+        selectedId: showingRun ? selectedTaskName : null,
+        onSelect: showingRun ? setSelectedTaskName : void 0
+      }
+    ) : /* @__PURE__ */ import_react3.default.createElement("p", { style: styles3.notice }, "Waiting for the run to appear\u2026")), showingRun && /* @__PURE__ */ import_react3.default.createElement(StatusLegend, null)) : /* @__PURE__ */ import_react3.default.createElement("p", { style: styles3.notice }, selectedId ? "Loading graph\u2026" : "Select a workflow.")), showingRun && selectedTaskName && /* @__PURE__ */ import_react3.default.createElement(
+      TaskPanel,
+      {
+        task: taskDetail,
+        loading: !taskDetail,
+        onClose: () => setSelectedTaskName(null)
+      }
+    )));
+  }
+  function RunHistory({ runs, openRunId, onOpen, latestVersion, openRunLive }) {
+    if (runs.length === 0) {
+      return /* @__PURE__ */ import_react3.default.createElement("p", { style: styles3.hint }, "No runs yet.");
+    }
+    return /* @__PURE__ */ import_react3.default.createElement("ul", { style: styles3.list }, runs.map((r) => {
+      const live = r.id === openRunId ? openRunLive : null;
+      const status = live?.status ?? r.status;
+      const counts = live?.counts ?? r.taskCounts;
+      const c = statusColors(status);
+      const parts = breakdown(counts);
+      const succeeded = counts?.succeeded ?? 0;
+      return /* @__PURE__ */ import_react3.default.createElement("li", { key: r.id }, /* @__PURE__ */ import_react3.default.createElement(
+        "button",
+        {
+          onClick: () => onOpen(r.id),
+          style: {
+            ...styles3.listButton,
+            ...r.id === openRunId ? styles3.listButtonActive : null
+          },
+          title: parts.map(([s, n]) => `${n} ${s}`).join(", ")
+        },
+        /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.runRow }, /* @__PURE__ */ import_react3.default.createElement(
+          "span",
+          {
+            style: {
+              ...styles3.dot,
+              background: c.fill,
+              borderColor: c.stroke
+            }
+          }
+        ), /* @__PURE__ */ import_react3.default.createElement("span", { style: { color: c.text, fontWeight: 600, fontSize: 12 } }, status), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfMeta }, succeeded, "/", r.taskCount)),
+        /* @__PURE__ */ import_react3.default.createElement(TaskBar, { parts, total: r.taskCount }),
+        /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfMeta }, relativeTime(r.createdAt), latestVersion !== void 0 && r.workflowVersion !== latestVersion ? ` \xB7 v${r.workflowVersion}` : "")
+      ));
+    }));
+  }
+  function TaskBar({ parts, total }) {
+    if (!total || parts.length === 0) return null;
+    return /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.bar, "aria-hidden": "true" }, parts.map(([status, n]) => {
+      const c = statusColors(status);
+      return /* @__PURE__ */ import_react3.default.createElement(
+        "span",
+        {
+          key: status,
+          style: {
+            width: `${n / total * 100}%`,
+            background: c.stroke,
+            display: "block"
+          }
+        }
+      );
+    }));
   }
   function RunSummary({ run }) {
     if (!run) {
-      return /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfMeta }, "starting\u2026");
+      return /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfMeta }, "starting\u2026");
     }
-    const succeeded = run.tasks.filter((t) => t.status === "succeeded").length;
     const live = !isRunFinished(run.status);
     const c = statusColors(run.status);
-    return /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.runSummary }, /* @__PURE__ */ import_react2.default.createElement("span", { style: { ...styles2.pill, background: c.fill, borderColor: c.stroke, color: c.text } }, run.status), /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfMeta }, succeeded, "/", run.tasks.length, " succeeded"), /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfMeta }, live ? "\xB7 polling" : "\xB7 finished"));
+    const parts = breakdown(countByStatus(run.tasks));
+    return /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.runSummary }, /* @__PURE__ */ import_react3.default.createElement("span", { style: { ...styles3.pill, background: c.fill, borderColor: c.stroke, color: c.text } }, run.status), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.counts }, parts.map(([status, n]) => /* @__PURE__ */ import_react3.default.createElement("span", { key: status, style: { color: statusColors(status).text } }, n, " ", status))), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfMeta }, live ? "\xB7 polling" : "\xB7 finished"));
   }
-  var styles2 = {
+  function relativeTime(iso) {
+    if (!iso) return "";
+    const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1e3);
+    if (seconds < 60) return `${Math.max(seconds, 0)}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+    return `${Math.floor(seconds / 86400)}d ago`;
+  }
+  var styles3 = {
     page: {
       font: "14px/1.5 system-ui, -apple-system, sans-serif",
       color: "#0f172a",
@@ -23534,9 +23856,22 @@
     body: { display: "flex", flex: 1, minHeight: 0 },
     sidebar: {
       width: 240,
+      flexShrink: 0,
       borderRight: "1px solid #e2e8f0",
-      padding: "16px 12px",
-      overflowY: "auto"
+      display: "flex",
+      flexDirection: "column",
+      minHeight: 0
+    },
+    // Takes the leftover height and scrolls inside it.
+    sidebarScroll: { flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 12px" },
+    // Capped so a long history cannot squeeze the workflow list out, and so the
+    // section is always on screen no matter how many workflows exist.
+    sidebarHistory: {
+      flexShrink: 0,
+      maxHeight: "45%",
+      overflowY: "auto",
+      padding: "12px",
+      borderTop: "1px solid #e2e8f0"
     },
     sidebarTitle: {
       margin: "0 0 8px",
@@ -23567,6 +23902,16 @@
     listButtonActive: { background: "#eef2ff", border: "1px solid #c7d2fe" },
     wfName: { fontWeight: 600 },
     wfMeta: { fontSize: 12, color: "#64748b" },
+    runRow: { display: "flex", alignItems: "center", gap: 6 },
+    dot: {
+      width: 9,
+      height: 9,
+      borderRadius: "50%",
+      borderWidth: 1.5,
+      borderStyle: "solid",
+      display: "inline-block",
+      flexShrink: 0
+    },
     canvas: { flex: 1, display: "flex", flexDirection: "column", minWidth: 0 },
     canvasHeader: {
       display: "flex",
@@ -23578,6 +23923,18 @@
     spacer: { flex: 1 },
     canvasBody: { flex: 1, minHeight: 0, padding: 20, background: "#f8fafc" },
     runSummary: { display: "flex", alignItems: "center", gap: 8 },
+    // Wraps rather than overflowing: a run mid-flight can be in four states at once,
+    // and the header must not push the buttons off the right edge.
+    counts: { display: "flex", flexWrap: "wrap", gap: "0 10px", fontSize: 12 },
+    bar: {
+      display: "flex",
+      width: "100%",
+      height: 4,
+      borderRadius: 2,
+      overflow: "hidden",
+      margin: "3px 0 1px",
+      background: "#e2e8f0"
+    },
     pill: {
       fontSize: 11,
       fontWeight: 600,
@@ -23611,7 +23968,7 @@
   };
   var container = document.getElementById("root");
   var root = (0, import_client.createRoot)(container);
-  root.render(/* @__PURE__ */ import_react2.default.createElement(App, null));
+  root.render(/* @__PURE__ */ import_react3.default.createElement(App, null));
 })();
 /*! Bundled license information:
 

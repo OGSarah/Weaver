@@ -160,6 +160,34 @@ back to Ready. It also means cancelling a run has to cancel Failed tasks alongsi
 Pending and Ready ones, or a cancelled run would still have work picked up when its
 backoff elapsed.
  
+### Task logs
+ 
+A handler is given a logger alongside its context and task, and every line it writes
+lands in the `task_logs` table against the task and attempt that produced it:
+ 
+```go
+reg.Register("extractData", func(ctx context.Context, task store.ClaimedTask, log *worker.TaskLogger) error {
+    log.Printf("fetching %d rows", n)
+    return nil
+})
+```
+ 
+Two decisions are worth knowing about.
+ 
+**Lines are written one at a time, as they happen,** rather than buffered and
+flushed when the task ends. That is chattier, and it is the right trade here: a
+buffered log is lost exactly when a worker is killed mid-task, which is the moment
+the log was worth keeping. It also means the UI can tail a task that is still
+running.
+ 
+**The state transitions log themselves,** in the same transaction that performs
+them. Claiming, succeeding, failing, retrying, being reaped, and being cancelled
+each write their own line, so a task's log is a complete account of its life even if
+its handler never logged anything, and a task can never be marked dead with nothing
+saying why. The attempt number on each line is what keeps a retried task readable:
+the UI groups by it, so "what did attempt 2 do differently" is answerable at a
+glance.
+ 
 ### Execution flow for a single run
  
 ```mermaid
@@ -301,9 +329,13 @@ GET    /api/workflows              list workflows (metadata only, no task lists)
 GET    /api/workflows/:id          fetch one workflow with its full task list,
                                    including the dependency edges the UI draws
 POST   /api/workflows/:id/runs     trigger a run
+GET    /api/workflows/:id/runs     run history, newest first (?limit=N).
+                                   Covers every version of the workflow's name,
+                                   not just the version in the path
 GET    /api/runs/:id               fetch run status, task states, and the
                                    dependency edges between them
-GET    /api/runs/:id/tasks/:tid    fetch a single task, including logs
+GET    /api/runs/:id/tasks/:tid    fetch a single task: timings, result payload,
+                                   and its log lines
 POST   /api/runs/:id/cancel        cancel an in-flight run
 
 GET    /healthz                    liveness probe (not under /api: it is an

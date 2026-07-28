@@ -83,6 +83,15 @@ func (s *Store) ClaimTask(ctx context.Context, workerID string, leaseTTL time.Du
 		return nil, fmt.Errorf("flip task %s running: %w", ct.ID, err)
 	}
 
+	// Open this attempt's entry in the task's log. Written in the claim
+	// transaction so the line and the Running state appear together: there is no
+	// instant where a task is running with nothing in its log to say who took it.
+	if err := appendTaskLogTx(ctx, tx, ct.ID, ct.Attempt, LogInfo,
+		fmt.Sprintf("attempt %d/%d started on worker %s", ct.Attempt, ct.MaxAttempts, workerID),
+	); err != nil {
+		return nil, err
+	}
+
 	// The lease is what makes the claim visible to the reaper (Phase 6). Its
 	// task_id is the primary key, so a second lease for the same task is
 	// impossible -- a structural backstop behind the row lock.

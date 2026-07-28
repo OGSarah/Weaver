@@ -25,7 +25,7 @@ const EDGE_COLOR = "#94a3b8";
 const ROOT_COLOR = "#6366f1";
 const NODE_BORDER = "#cbd5e1";
 
-export function Dag({ tasks }) {
+export function Dag({ tasks, selectedId, onSelect }) {
 	// While a run is polling, a new tasks array arrives every second with the same
 	// nodes and edges and only the statuses changed. The shape of the graph is what
 	// layout is expensive to compute and is exactly what did not change, so the memo
@@ -97,7 +97,13 @@ export function Dag({ tasks }) {
 
 				<g>
 					{nodes.map((n) => (
-						<TaskNode key={n.id} node={n} task={currentById.get(n.id)} />
+						<TaskNode
+							key={n.id}
+							node={n}
+							task={currentById.get(n.id)}
+							selected={n.id === selectedId}
+							onSelect={onSelect}
+						/>
 					))}
 				</g>
 			</svg>
@@ -108,7 +114,7 @@ export function Dag({ tasks }) {
 // TaskNode draws one box: its border and tint from the task's status, its labels
 // from the definition. node supplies geometry, task supplies current state; they are
 // separate because the geometry survives a poll and the state does not.
-function TaskNode({ node, task }) {
+function TaskNode({ node, task, selected, onSelect }) {
 	const { x, y, width, height } = node;
 	if (!task) {
 		return null;
@@ -135,7 +141,38 @@ function TaskNode({ node, task }) {
 	const showAttempt = (task.attempt ?? 0) > 1;
 
 	return (
-		<g>
+		<g
+			onClick={onSelect ? () => onSelect(task.id) : undefined}
+			style={onSelect ? { cursor: "pointer" } : undefined}
+			// Keyboard reachable, because a click target that opens the only view of
+			// a task's logs should not be mouse-only.
+			tabIndex={onSelect ? 0 : undefined}
+			role={onSelect ? "button" : undefined}
+			onKeyDown={
+				onSelect
+					? (e) => {
+							if (e.key === "Enter" || e.key === " ") {
+								e.preventDefault();
+								onSelect(task.id);
+							}
+						}
+					: undefined
+			}
+		>
+			{/* Selection is drawn as a halo behind the node rather than by changing
+			    its border, which is already carrying the status colour. */}
+			{selected && (
+				<rect
+					x={x - 4}
+					y={y - 4}
+					width={width + 8}
+					height={height + 8}
+					rx={NODE_RADIUS + 3}
+					fill="none"
+					stroke="#4f46e5"
+					strokeWidth="2"
+				/>
+			)}
 			<rect
 				x={x}
 				y={y}

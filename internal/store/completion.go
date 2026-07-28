@@ -59,6 +59,12 @@ func (s *Store) CompleteTask(ctx context.Context, task *ClaimedTask, workerID st
 		return fmt.Errorf("mark task %s succeeded: %w", task.ID, err)
 	}
 
+	if err := appendTaskLogTx(ctx, tx, task.ID, task.Attempt, LogInfo,
+		fmt.Sprintf("attempt %d succeeded", task.Attempt),
+	); err != nil {
+		return err
+	}
+
 	if _, err := markReadyTasks(ctx, tx, task.RunID); err != nil {
 		return err
 	}
@@ -123,6 +129,19 @@ func (s *Store) FailTask(ctx context.Context, task *ClaimedTask, workerID, cause
 		if err != nil {
 			return fmt.Errorf("schedule retry for task %s: %w", task.ID, err)
 		}
+		// Two lines: what went wrong, then what happens next. The delay is worth
+		// recording because it is jittered, so it cannot be inferred from the
+		// attempt number alone.
+		if err := appendTaskLogTx(ctx, tx, task.ID, task.Attempt, LogError,
+			fmt.Sprintf("attempt %d failed: %s", task.Attempt, cause),
+		); err != nil {
+			return err
+		}
+		if err := appendTaskLogTx(ctx, tx, task.ID, task.Attempt, LogInfo,
+			fmt.Sprintf("retrying in %s (attempt %d of %d)", delay.Round(time.Millisecond), task.Attempt+1, task.MaxAttempts),
+		); err != nil {
+			return err
+		}
 	} else {
 		_, err = tx.Exec(ctx,
 			`UPDATE tasks
@@ -132,6 +151,16 @@ func (s *Store) FailTask(ctx context.Context, task *ClaimedTask, workerID, cause
 		)
 		if err != nil {
 			return fmt.Errorf("mark task %s dead: %w", task.ID, err)
+		}
+		if err := appendTaskLogTx(ctx, tx, task.ID, task.Attempt, LogError,
+			fmt.Sprintf("attempt %d failed: %s", task.Attempt, cause),
+		); err != nil {
+			return err
+		}
+		if err := appendTaskLogTx(ctx, tx, task.ID, task.Attempt, LogError,
+			fmt.Sprintf("no attempts left after %d; giving up", task.MaxAttempts),
+		); err != nil {
+			return err
 		}
 		if err := markRunFailed(ctx, tx, task.RunID); err != nil {
 			return err

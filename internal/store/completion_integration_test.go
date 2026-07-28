@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -327,6 +328,89 @@ func TestCancelRunCancelsTaskAwaitingRetry(t *testing.T) {
 	} else if ct != nil && ct.RunID == runID {
 		t.Errorf("cancelled task was claimed as attempt %d", ct.Attempt)
 	}
+}
+
+// TestTaskLogsSpanAttempts checks the log survives a retry and stays attributable:
+// the lifecycle lines are written in the same transactions as the state changes
+// they describe, and every line carries the attempt that produced it, so a task
+// that failed once and then succeeded reads as two distinct attempts rather than
+// one confused stream.
+func TestTaskLogsSpanAttempts(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	runID := seedRun(t, s, workflow.WorkflowDef{
+		Name:  fmt.Sprintf("logs-%d", time.Now().UnixNano()),
+		Tasks: []workflow.TaskDef{{ID: "flaky", Handler: "h", Retries: 2}},
+	})
+
+	// Attempt 1 fails, with a handler line of its own before it does.
+	ct := claimOne(t, s, "w1", runID)
+	if err := s.AppendTaskLog(ctx, ct.ID, ct.Attempt, LogInfo, "doing the thing"); err != nil {
+		t.Fatalf("append log: %v", err)
+	}
+	if err := s.FailTask(ctx, ct, "w1", "boom"); err != nil {
+		t.Fatalf("fail: %v", err)
+	}
+
+	// Attempt 2 succeeds.
+	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET scheduled_at = now() WHERE run_id = $1`, runID); err != nil {
+		t.Fatalf("fast-forward backoff: %v", err)
+	}
+	ct = claimOne(t, s, "w1", runID)
+	if ct.Attempt != 2 {
+		t.Fatalf("second claim: want attempt 2, got %d", ct.Attempt)
+	}
+	if err := s.CompleteTask(ctx, ct, "w1"); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+
+	lines, truncated, err := s.ListTaskLogs(ctx, ct.ID)
+	if err != nil {
+		t.Fatalf("list logs: %v", err)
+	}
+	if truncated {
+		t.Errorf("a handful of lines should not report truncation")
+	}
+
+	// Every line belongs to one of the two attempts, and they come back in order.
+	var byAttempt = map[int][]string{}
+	prev := 0
+	for _, l := range lines {
+		if l.Attempt < prev {
+			t.Fatalf("attempts out of order: %d after %d", l.Attempt, prev)
+		}
+		prev = l.Attempt
+		byAttempt[l.Attempt] = append(byAttempt[l.Attempt], l.Message)
+	}
+
+	// Attempt 1: claimed, the handler's own line, failed, and the retry notice.
+	if got := len(byAttempt[1]); got < 4 {
+		t.Errorf("attempt 1: want at least 4 lines (start, handler, failure, retry), got %d: %v",
+			got, byAttempt[1])
+	}
+	if !containsSubstring(byAttempt[1], "doing the thing") {
+		t.Errorf("attempt 1 lost the handler's line: %v", byAttempt[1])
+	}
+	if !containsSubstring(byAttempt[1], "boom") {
+		t.Errorf("attempt 1 should record the failure cause: %v", byAttempt[1])
+	}
+	// Attempt 2: claimed and succeeded, with no trace of attempt 1's failure.
+	if !containsSubstring(byAttempt[2], "succeeded") {
+		t.Errorf("attempt 2 should record success: %v", byAttempt[2])
+	}
+	if containsSubstring(byAttempt[2], "boom") {
+		t.Errorf("attempt 1's failure leaked into attempt 2: %v", byAttempt[2])
+	}
+}
+
+func containsSubstring(haystack []string, needle string) bool {
+	for _, s := range haystack {
+		if strings.Contains(s, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 // TestBackoffDelay checks the backoff is monotonic up to the cap and always

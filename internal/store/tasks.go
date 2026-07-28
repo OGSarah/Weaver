@@ -82,6 +82,20 @@ func (s *Store) CancelRun(ctx context.Context, runID string) error {
 		return ErrNotCancellable
 	}
 
+	// Log the cancellation before the update, while the rows still carry the
+	// statuses being cancelled. Same transaction, so the lines and the state change
+	// are all-or-nothing, and the WHERE clause matches the update's exactly.
+	_, err = tx.Exec(ctx,
+		`INSERT INTO task_logs (task_id, attempt, level, message)
+		 SELECT id, attempt, 'info', 'run cancelled; this task will not run'
+		   FROM tasks
+		  WHERE run_id = $1 AND status IN ('pending', 'ready', 'failed')`,
+		runID,
+	)
+	if err != nil {
+		return fmt.Errorf("log task cancellations: %w", err)
+	}
+
 	// Stop everything not currently executing from ever being claimed. 'failed'
 	// belongs in this list because it is a waiting state, not a terminal one: a
 	// failed task still has attempts left and would be picked up the moment its
