@@ -552,15 +552,6 @@ curl -s -X POST localhost:8080/api/runs/<run-id>/cancel
 
 Workflows that carry a `schedule` are picked up by the scheduler, which creates a run each time a cron slot comes due. If the scheduler was down across several slots, it backfills a run for each missed slot when it returns rather than skipping them. The run for a given slot is created exactly once even if several schedulers are running: the insert is guarded by a unique index on `(workflow_id, scheduled_for)`, so the losers of the race become no-ops rather than duplicate runs.
 
-## Testing the failure paths
- 
-The parts worth proving out with tests or manual chaos:
- 
-- Kill a worker while a task is RUNNING and confirm the task is reclaimed after the lease expires.
-- Trigger the same run twice and confirm idempotent handlers do not double-apply effects.
-- Force a task to fail repeatedly and confirm backoff timing, then confirm it lands in DEAD after attempts are exhausted.
-- Start many workers against a small queue and confirm no task is executed by two workers at once.
-
 ## License
 
 Released under the [MIT License](LICENSE). © 2026 SarahUniverse
