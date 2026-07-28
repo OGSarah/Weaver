@@ -9,16 +9,6 @@
 
 A DAG-based job scheduler and workflow orchestrator. Weaver lets you define workflows as directed acyclic graphs of tasks, schedule them, execute them across a pool of workers, and recover automatically when things fail. Think of it as a small, readable, from-scratch take on the ideas behind Airflow and Temporal.
 
-## Why this exists
-
-Weaver is built to exercise the harder, more interesting problems that show up once you take execution reliability seriously. They are:
-
-- At-least-once execution with idempotency, so a retried task does not corrupt state.
-- Dead worker detection via heartbeats and lease expiry, so a crashed worker does not strand its work.
-- Dependency resolution across a DAG, so tasks only run once their upstreams succeed.
-- Retries with exponential backoff and timeouts, so transient failures self-heal.
-- A queue that survives restarts, backed by Postgres rather than in-memory state.
-
 <details>
 <summary><h2>Understanding DAGS</h2></summary>
 
