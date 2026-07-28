@@ -7,8 +7,8 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "build": "esbuild src/main.jsx --bundle --outfile=dist/bundle.js",
-    "dev": "esbuild src/main.jsx --bundle --outfile=dist/bundle.js --watch"
+    "build": "esbuild src/main.jsx --bundle --outfile=dist/bundle.js --loader:.png=file --public-path=/dist",
+    "dev": "esbuild src/main.jsx --bundle --outfile=dist/bundle.js --loader:.png=file --public-path=/dist --watch"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.0.0",

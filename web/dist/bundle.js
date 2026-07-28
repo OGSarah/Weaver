@@ -23659,6 +23659,9 @@
     muted: { color: color.textFaint, padding: "0 0 8px" }
   };
 
+  // ../docs/branding/weaver-wordmark.png
+  var weaver_wordmark_default = "/dist/weaver-wordmark-NRWJHXXQ.png";
+
   // src/main.jsx
   var POLL_MS = 1e3;
   async function getJSON(path, { signal, method = "GET" } = {}) {
@@ -23807,7 +23810,7 @@
     }
     const showingRun = Boolean(runId);
     const tasks = showingRun ? runTasks : detail?.tasks;
-    return /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.page }, /* @__PURE__ */ import_react3.default.createElement("header", { style: styles3.header }, /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.logo }, "W"), /* @__PURE__ */ import_react3.default.createElement("h1", { style: styles3.title }, "Weaver"), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.spacer }), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfMeta }, workflows.length, " workflow", workflows.length === 1 ? "" : "s")), error && /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.errorBar }, error, /* @__PURE__ */ import_react3.default.createElement("button", { onClick: () => setError(null), style: styles3.dismiss }, "dismiss")), /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.body }, /* @__PURE__ */ import_react3.default.createElement("nav", { style: styles3.sidebar }, /* @__PURE__ */ import_react3.default.createElement("section", { style: styles3.sidebarScroll }, /* @__PURE__ */ import_react3.default.createElement("h2", { style: styles3.sidebarTitle }, "Workflows"), workflows.length === 0 && /* @__PURE__ */ import_react3.default.createElement("p", { style: styles3.hint }, "No workflows registered. POST one to ", /* @__PURE__ */ import_react3.default.createElement("code", null, "/api/workflows"), "."), /* @__PURE__ */ import_react3.default.createElement("ul", { style: styles3.list }, workflows.map((wf) => /* @__PURE__ */ import_react3.default.createElement("li", { key: wf.id }, /* @__PURE__ */ import_react3.default.createElement(
+    return /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.page }, /* @__PURE__ */ import_react3.default.createElement("header", { style: styles3.header }, /* @__PURE__ */ import_react3.default.createElement("h1", { style: styles3.title }, /* @__PURE__ */ import_react3.default.createElement("img", { src: weaver_wordmark_default, alt: "Weaver", style: styles3.wordmark })), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.spacer }), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfMeta }, workflows.length, " workflow", workflows.length === 1 ? "" : "s")), error && /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.errorBar }, error, /* @__PURE__ */ import_react3.default.createElement("button", { onClick: () => setError(null), style: styles3.dismiss }, "dismiss")), /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.body }, /* @__PURE__ */ import_react3.default.createElement("nav", { style: styles3.sidebar }, /* @__PURE__ */ import_react3.default.createElement("section", { style: styles3.sidebarScroll }, /* @__PURE__ */ import_react3.default.createElement("h2", { style: styles3.sidebarTitle }, "Workflows"), workflows.length === 0 && /* @__PURE__ */ import_react3.default.createElement("p", { style: styles3.hint }, "No workflows registered. POST one to ", /* @__PURE__ */ import_react3.default.createElement("code", null, "/api/workflows"), "."), /* @__PURE__ */ import_react3.default.createElement("ul", { style: styles3.list }, workflows.map((wf) => /* @__PURE__ */ import_react3.default.createElement("li", { key: wf.id }, /* @__PURE__ */ import_react3.default.createElement(
       "button",
       {
         onClick: () => setSelectedId(wf.id),
@@ -23951,26 +23954,14 @@
       borderBottom: `1px solid ${color.border}`,
       background: color.surface
     },
-    title: {
-      margin: 0,
-      fontSize: 14,
-      fontWeight: 600,
-      letterSpacing: "0.02em",
-      color: color.text
-    },
-    // A small mark so the header is not just a word in the corner.
-    logo: {
-      width: 18,
-      height: 18,
-      borderRadius: 5,
-      background: color.accent,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 11,
-      fontWeight: 700,
-      color: "#fff"
-    },
+    // The h1 is now only a wrapper for the image, so it carries no type styling of
+    // its own; flex kills the inline-image baseline gap that would otherwise push
+    // the header a few pixels taller than its siblings.
+    title: { margin: 0, display: "flex", alignItems: "center" },
+    // Sized by height so the header row stays fixed no matter what the asset's
+    // aspect ratio is; width follows from it. The source is 1200x340 with generous
+    // transparent padding, so the visible mark is smaller than this box implies.
+    wordmark: { height: 30, width: "auto", display: "block" },
     errorBar: {
       display: "flex",
       alignItems: "center",

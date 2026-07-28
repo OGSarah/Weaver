@@ -5,6 +5,13 @@ import { TaskPanel } from "./TaskPanel.jsx";
 import { breakdown, countByStatus, isRunFinished, statusColors } from "./status.js";
 import { color, font, shared } from "./theme.js";
 
+// Imported rather than referenced by path, and imported from docs/branding rather
+// than from a copy inside web/, so the wordmark has exactly one source in the repo:
+// the same file the README shows. esbuild's `file` loader (see package.json) copies
+// it into dist/ with a content hash in the name and resolves this import to its
+// public URL, which is the other half of what a bundler does beyond JS.
+import wordmarkUrl from "../../docs/branding/weaver-wordmark.png";
+
 // The UI is a read layer over the database and nothing more. It picks a workflow,
 // draws its DAG, triggers runs, watches them, and reads back what each task did.
 // Every guarantee that matters (no double execution, retries, dead worker recovery)
@@ -244,8 +251,13 @@ function App() {
 	return (
 		<div style={styles.page}>
 			<header style={styles.header}>
-				<span style={styles.logo}>W</span>
-				<h1 style={styles.title}>Weaver</h1>
+				{/* The wordmark carries the product name, so it stays inside the h1:
+				    the heading level is what a screen reader announces, and the alt
+				    text is what it reads out. An <img> on its own would leave the page
+				    with no heading at all. */}
+				<h1 style={styles.title}>
+					<img src={wordmarkUrl} alt="Weaver" style={styles.wordmark} />
+				</h1>
 				<span style={styles.spacer} />
 				<span style={styles.wfMeta}>
 					{workflows.length} workflow{workflows.length === 1 ? "" : "s"}
@@ -532,26 +544,14 @@ const styles = {
 		borderBottom: `1px solid ${color.border}`,
 		background: color.surface,
 	},
-	title: {
-		margin: 0,
-		fontSize: 14,
-		fontWeight: 600,
-		letterSpacing: "0.02em",
-		color: color.text,
-	},
-	// A small mark so the header is not just a word in the corner.
-	logo: {
-		width: 18,
-		height: 18,
-		borderRadius: 5,
-		background: color.accent,
-		display: "flex",
-		alignItems: "center",
-		justifyContent: "center",
-		fontSize: 11,
-		fontWeight: 700,
-		color: "#fff",
-	},
+	// The h1 is now only a wrapper for the image, so it carries no type styling of
+	// its own; flex kills the inline-image baseline gap that would otherwise push
+	// the header a few pixels taller than its siblings.
+	title: { margin: 0, display: "flex", alignItems: "center" },
+	// Sized by height so the header row stays fixed no matter what the asset's
+	// aspect ratio is; width follows from it. The source is 1200x340 with generous
+	// transparent padding, so the visible mark is smaller than this box implies.
+	wordmark: { height: 30, width: "auto", display: "block" },
 	errorBar: {
 		display: "flex",
 		alignItems: "center",

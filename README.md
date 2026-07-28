@@ -427,6 +427,14 @@ Both commands bundle `src/main.jsx`, resolving imports and transforming JSX into
 `dist/bundle.js`, which `index.html` loads. `npm run dev` only rebuilds the bundle; it
 does not reload the browser, so refresh to see changes.
 
+They also handle one non-JS import. The header wordmark is `import`ed straight from
+`docs/branding/`, and the `--loader:.png=file` flag tells esbuild to copy that file
+into `dist/` under a content-hashed name and resolve the import to its URL
+(`--public-path=/dist`, which is where the Go file server exposes it). So the image
+has one source in the repo, the same file the README shows, rather than a second copy
+living under `web/`. Emitting assets like this is the other half of what a bundler
+does, beyond resolving and transforming JavaScript.
+
 Colours and spacing come from `web/src/theme.js`, and the task state palette from
 `web/src/status.js`. Those two files are the whole design system; components import
 from them rather than writing literal colours.
@@ -681,10 +689,12 @@ visible on a browser refresh with no Go rebuild and no image rebuild.
 **The cost:** the binary is no longer self-contained; it needs `web/` next to it. This
 is the decision most likely to be worth reversing once the UI stops changing hourly.
 
-### `web/dist/bundle.js` is committed
+### `web/dist/` is committed
 
 Committing build output is normally a smell. It is here so a fresh clone plus
 `docker compose up --build` produces a working UI with no Node toolchain involved.
+That covers `bundle.js` and the hashed copy of the wordmark esbuild emits beside it;
+both are build products, and both have to be present for the page to render.
 
 **The cost:** every frontend change produces a large, unreadable diff, and the
 committed artifact can silently drift from the source that supposedly produced it.
