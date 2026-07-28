@@ -481,13 +481,6 @@ Committing build output is normally a smell. It is here so a fresh clone plus
 committed artifact can silently drift from the source that supposedly produced it.
 Worth revisiting when the UI is real: the fix is a Node stage in the Dockerfile.
 
-## Roadmap
- 
-- Sub-workflows and fan-out / fan-in patterns (dynamic task generation).
-- A metrics endpoint exposing queue depth, run latency, and worker liveness.
-- Pluggable handler runtimes so tasks can run as containers or remote calls.
-- Priority queues and per-workflow concurrency limits.
-
 ## License
 
 Released under the [MIT License](LICENSE). © 2026 SarahUniverse
