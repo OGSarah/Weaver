@@ -19,7 +19,8 @@ Weaver is built to exercise the harder, more interesting problems that show up o
 - Retries with exponential backoff and timeouts, so transient failures self-heal.
 - A queue that survives restarts, backed by Postgres rather than in-memory state.
 
-## Understanding DAGS
+<details>
+<summary><h2>Understanding DAGS</h2></summary>
 
 DAG stands for Directed Acyclic Graph. It is the concept the entire project is built around, so it is worth taking the time to understand before doing anything else. Break the name into its three parts:
 
@@ -45,6 +46,8 @@ A[Task A] --> B[Task B]
 B --> C[Task C]
 C --> A
 ```
+
+</details>
 
 ## Why acyclic matters
 
@@ -79,8 +82,10 @@ Because of this, one of the first things Weaver does when a workflow is submitte
 - Automatic recovery of tasks orphaned by dead workers.
 - A React UI that renders the DAG, shows live run status, and exposes logs and run history.
 - A REST API for triggering runs, inspecting state, and managing workflow definitions.
-## Architecture
- 
+
+<details>
+<summary><h2>Architecture</h2></summary>
+
 Weaver splits into four moving parts: 
 1. An API server
 2. A Postgres-backed store that doubles as the task queue
@@ -216,8 +221,11 @@ sequenceDiagram
     end
 ```
  
-## How the hard parts work
- 
+</details>
+
+<details>
+<summary><h2>How the hard parts work</h2></summary>
+
 ### At-least-once, not exactly-once
  
 Weaver guarantees a task will run at least once. Exactly-once is not achievable in a distributed system without cooperation from the task itself, so tasks are expected to be idempotent. Each task execution carries a stable run ID and task ID that handlers can use as an idempotency key.
@@ -234,6 +242,8 @@ When a worker claims a task it also writes a lease with an expiry timestamp, and
  
 Each task has a max attempt count and a base backoff. On failure, Weaver computes the next eligible run time using exponential backoff with jitter, and the task will not be claimable again until that time passes. A task that exceeds its timeout is treated as a failure and follows the same path.
  
+</details>
+
 ## Data model
  
 The core tables (simplified):
@@ -261,7 +271,8 @@ The backend is written in Go, split into three binaries (`cmd/api`, `cmd/schedul
 
 Deliberately not used: a separate message broker (Redis, RabbitMQ, Kafka) or an external lock service. Keeping the queue and locks inside Postgres is the whole point, since it gives transactional state transitions and one source of truth. Adding a broker later is a reasonable extension, not a starting requirement.
 
-## Getting started
+<details>
+<summary><h2>Getting started</h2></summary>
 
 Everything below assumes a clean machine and a clean database, and ends with the UI
 open in a browser and real runs moving through it.
@@ -350,6 +361,8 @@ docker compose down                  # stop, keeping the database volume
 docker compose down -v               # stop and delete all data
 ```
 
+</details>
+
 ## What to try
 
 The demo handlers finish in well under a second, so a run is over in a few seconds.
@@ -398,7 +411,8 @@ with `worker lease expired; requeued by reaper` in its log. Bring workers back w
 `docker compose up -d --scale worker=2` and another one finishes it, on the next
 attempt number. Nothing is lost and nothing runs twice.
 
-## Frontend development
+<details>
+<summary><h2>Frontend development</h2></summary>
 
 Skip this unless you are changing the UI. The Docker image builds the bundle itself,
 so the steps above never need npm.
@@ -443,6 +457,8 @@ does, beyond resolving and transforming JavaScript.
 Colours and spacing come from `web/src/theme.js`, and the task state palette from
 `web/src/status.js`. Those two files are the whole design system; components import
 from them rather than writing literal colours.
+
+</details>
 
 ## Running without Docker
 
