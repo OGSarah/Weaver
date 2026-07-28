@@ -584,11 +584,13 @@ Workflows that carry a `schedule` are picked up by the scheduler, which creates 
 <summary><h2>Testing</h2></summary>
 
 ```bash
+
 make test-db     # create weaver_test and apply the migrations (once, and after adding one)
 make test        # everything, including the tests that need Postgres
 make test-unit   # only the tests that need nothing; the rest skip themselves
 make lint        # gofmt, go vet, eslint
 cd web && npm test
+
 ```
 
 The tests that touch a database point at `weaver_test`, not the `weaver` database
