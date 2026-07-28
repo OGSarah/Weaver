@@ -47,9 +47,7 @@ B --> C[Task C]
 C --> A
 ```
 
-</details>
-
-## Why acyclic matters
+### Why acyclic matters
 
 The acyclic property is what makes the whole system computable. Because there are no cycles, two things are always true:
 
@@ -63,6 +61,8 @@ The worker loop is essentially:
 - Repeat. The algorithm only terminates because the graph is acyclic.
 
 Because of this, one of the first things Weaver does when a workflow is submitted is validate that it is actually a DAG, rejecting any definition that contains a cycle before it ever tries to run. Cycle detection is a classic depth-first-search problem.
+
+</details>
 
 ## Glossary
 
