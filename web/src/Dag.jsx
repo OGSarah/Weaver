@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import { layoutDag, edgePath } from "./layout.js";
 import { statusColors, STATUS_ORDER } from "./status.js";
+import { color, font, shared } from "./theme.js";
 
 // Dag draws a workflow as a directed graph: one box per task, one arrow per
 // dependency, roots at the top.
@@ -18,12 +19,18 @@ import { statusColors, STATUS_ORDER } from "./status.js";
 // and a twenty-task workflow needs no zoom controls to stay on screen.
 
 // Corner rounding on the task boxes.
-const NODE_RADIUS = 6;
+const NODE_RADIUS = 7;
 
-// Slate for the edges, indigo to mark a root task in the definition view.
-const EDGE_COLOR = "#94a3b8";
-const ROOT_COLOR = "#6366f1";
-const NODE_BORDER = "#cbd5e1";
+// How far a graph smaller than its panel is allowed to be scaled up. See the note
+// on the svg's maxWidth below.
+const MAX_SCALE = 1.35;
+
+// Edges sit a step below the node borders in contrast, so the structure reads as
+// connective tissue and the nodes stay the thing you look at.
+const EDGE_COLOR = "#3d4a5d";
+const ROOT_COLOR = color.accent;
+const NODE_BORDER = color.borderStrong;
+const NODE_FILL = color.surface;
 
 export function Dag({ tasks, selectedId, onSelect }) {
 	// While a run is polling, a new tasks array arrives every second with the same
@@ -55,11 +62,17 @@ export function Dag({ tasks, selectedId, onSelect }) {
 				// meet keeps the aspect ratio and fits the whole graph inside the box,
 				// rather than cropping it or stretching the boxes out of shape.
 				preserveAspectRatio="xMidYMid meet"
-				// The max sizes are the graph's own dimensions, which caps scaling at
-				// 1:1. Without them a four-task DAG would be magnified to fill the
-				// panel and its labels would render several times their intended size.
-				// Large graphs still scale down to fit; small ones just sit centered.
-				style={{ ...styles.svg, maxWidth: width, maxHeight: height }}
+				// Scaling is capped rather than unlimited. Left to fill the panel, a
+				// four-task DAG on a wide screen is magnified two or three times and
+				// its labels render huge; pinned at exactly 1:1 it instead sits marooned
+				// in a field of empty canvas. MAX_SCALE splits the difference: small
+				// graphs grow enough to occupy the space, not enough to look wrong.
+				// Large graphs are unaffected, still scaling down to fit.
+				style={{
+					...styles.svg,
+					maxWidth: width * MAX_SCALE,
+					maxHeight: height * MAX_SCALE,
+				}}
 				role="img"
 				aria-label="Workflow dependency graph"
 			>
@@ -127,9 +140,9 @@ function TaskNode({ node, task, selected, onSelect }) {
 	const isRoot = (task.dependsOn ?? []).length === 0;
 
 	const colors = status ? statusColors(status) : null;
-	const fill = colors ? colors.fill : "#ffffff";
+	const fill = colors ? colors.fill : NODE_FILL;
 	const stroke = colors ? colors.stroke : isRoot ? ROOT_COLOR : NODE_BORDER;
-	const strokeWidth = colors ? 2 : isRoot ? 2 : 1.5;
+	const strokeWidth = colors ? 1.5 : isRoot ? 1.5 : 1;
 
 	// In a run the status is the interesting label; the handler is a property of the
 	// definition and is one click away in the definition view.
@@ -169,10 +182,21 @@ function TaskNode({ node, task, selected, onSelect }) {
 					height={height + 8}
 					rx={NODE_RADIUS + 3}
 					fill="none"
-					stroke="#4f46e5"
-					strokeWidth="2"
+					stroke={color.accent}
+					strokeWidth="1.5"
+					opacity="0.9"
 				/>
 			)}
+			{/* An opaque plate under the translucent status fill. Without it the fill
+			    would blend with whatever edge happens to pass behind the node. */}
+			<rect
+				x={x}
+				y={y}
+				width={width}
+				height={height}
+				rx={NODE_RADIUS}
+				fill={NODE_FILL}
+			/>
 			<rect
 				x={x}
 				y={y}
@@ -203,11 +227,12 @@ function TaskNode({ node, task, selected, onSelect }) {
 			    shared transform, so each can be nudged independently. */}
 			<text
 				x={x + width / 2}
-				y={y + 22}
+				y={y + 23}
 				textAnchor="middle"
 				fontSize="13"
 				fontWeight="600"
-				fill="#0f172a"
+				fill={color.text}
+				style={{ letterSpacing: "-0.01em" }}
 			>
 				{task.id}
 			</text>
@@ -215,16 +240,24 @@ function TaskNode({ node, task, selected, onSelect }) {
 				x={x + width / 2}
 				y={y + 40}
 				textAnchor="middle"
-				fontSize="11"
+				fontSize="10.5"
 				fontWeight={status ? 600 : 400}
-				fill={colors ? colors.text : "#64748b"}
+				fill={colors ? colors.text : color.textMuted}
+				style={status ? { letterSpacing: "0.04em" } : { fontFamily: font.mono }}
 			>
-				{sublabel}
+				{status ? sublabel.toUpperCase() : sublabel}
 			</text>
 
 			{showAttempt && (
-				<text x={x + width - 8} y={y + 14} textAnchor="end" fontSize="9" fill="#94a3b8">
-					try {task.attempt}/{task.maxAttempts}
+				<text
+					x={x + width - 9}
+					y={y + 15}
+					textAnchor="end"
+					fontSize="9"
+					fontFamily={font.mono}
+					fill={color.textFaint}
+				>
+					{task.attempt}/{task.maxAttempts}
 				</text>
 			)}
 
@@ -251,7 +284,7 @@ export function StatusLegend() {
 								borderColor: c.stroke,
 							}}
 						/>
-						<span style={{ color: c.text }}>{status}</span>
+						<span style={{ color: c.text, textTransform: "uppercase" }}>{status}</span>
 					</li>
 				);
 			})}
@@ -277,25 +310,26 @@ const styles = {
 		display: "block",
 	},
 	empty: {
-		color: "#64748b",
-		fontStyle: "italic",
+		color: color.textFaint,
 	},
 	legend: {
 		display: "flex",
 		flexWrap: "wrap",
-		gap: "4px 14px",
+		gap: "5px 16px",
 		listStyle: "none",
 		margin: 0,
-		padding: "8px 20px",
-		fontSize: 11,
-		borderTop: "1px solid #e2e8f0",
+		padding: "9px 20px",
+		fontSize: 10.5,
+		letterSpacing: "0.03em",
+		borderTop: `1px solid ${color.border}`,
+		background: color.surface,
 	},
-	legendItem: { display: "flex", alignItems: "center", gap: 5 },
+	legendItem: { display: "flex", alignItems: "center", gap: 6 },
 	swatch: {
-		width: 11,
-		height: 11,
-		borderRadius: 3,
-		borderWidth: 1.5,
+		width: 9,
+		height: 9,
+		borderRadius: 2,
+		borderWidth: 1,
 		borderStyle: "solid",
 		display: "inline-block",
 	},

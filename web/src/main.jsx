@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { Dag, StatusLegend } from "./Dag.jsx";
 import { TaskPanel } from "./TaskPanel.jsx";
 import { breakdown, countByStatus, isRunFinished, statusColors } from "./status.js";
+import { color, font, shared } from "./theme.js";
 
 // The UI is a read layer over the database and nothing more. It picks a workflow,
 // draws its DAG, triggers runs, watches them, and reads back what each task did.
@@ -243,7 +244,12 @@ function App() {
 	return (
 		<div style={styles.page}>
 			<header style={styles.header}>
+				<span style={styles.logo}>W</span>
 				<h1 style={styles.title}>Weaver</h1>
+				<span style={styles.spacer} />
+				<span style={styles.wfMeta}>
+					{workflows.length} workflow{workflows.length === 1 ? "" : "s"}
+				</span>
 			</header>
 
 			{error && (
@@ -311,7 +317,7 @@ function App() {
 					{detail ? (
 						<>
 							<div style={styles.canvasHeader}>
-								<strong>{detail.name}</strong>
+								<strong style={styles.canvasName}>{detail.name}</strong>
 								{showingRun ? (
 									<RunSummary run={run} />
 								) : (
@@ -509,31 +515,58 @@ function relativeTime(iso) {
 
 const styles = {
 	page: {
-		font: "14px/1.5 system-ui, -apple-system, sans-serif",
-		color: "#0f172a",
+		font: `14px/1.5 ${font.sans}`,
+		color: color.text,
+		background: color.bg,
 		height: "100vh",
 		display: "flex",
 		flexDirection: "column",
 	},
 	header: {
-		padding: "12px 20px",
-		borderBottom: "1px solid #e2e8f0",
+		display: "flex",
+		alignItems: "center",
+		gap: 10,
+		padding: "0 18px",
+		height: 46,
+		flexShrink: 0,
+		borderBottom: `1px solid ${color.border}`,
+		background: color.surface,
 	},
-	title: { margin: 0, fontSize: 18 },
+	title: {
+		margin: 0,
+		fontSize: 14,
+		fontWeight: 600,
+		letterSpacing: "0.02em",
+		color: color.text,
+	},
+	// A small mark so the header is not just a word in the corner.
+	logo: {
+		width: 18,
+		height: 18,
+		borderRadius: 5,
+		background: color.accent,
+		display: "flex",
+		alignItems: "center",
+		justifyContent: "center",
+		fontSize: 11,
+		fontWeight: 700,
+		color: "#fff",
+	},
 	errorBar: {
 		display: "flex",
 		alignItems: "center",
 		gap: 10,
-		padding: "8px 20px",
-		background: "#fef2f2",
-		color: "#b91c1c",
-		borderBottom: "1px solid #fecaca",
-		fontSize: 13,
+		padding: "8px 18px",
+		background: color.dangerSoft,
+		color: color.danger,
+		borderBottom: `1px solid ${color.dangerBorder}`,
+		fontSize: 12.5,
+		flexShrink: 0,
 	},
 	dismiss: {
 		border: "none",
 		background: "none",
-		color: "#b91c1c",
+		color: color.danger,
 		textDecoration: "underline",
 		cursor: "pointer",
 		font: "inherit",
@@ -543,31 +576,26 @@ const styles = {
 	// lets a flex child actually shrink instead of overflowing its parent.
 	body: { display: "flex", flex: 1, minHeight: 0 },
 	sidebar: {
-		width: 240,
+		width: 244,
 		flexShrink: 0,
-		borderRight: "1px solid #e2e8f0",
+		borderRight: `1px solid ${color.border}`,
 		display: "flex",
 		flexDirection: "column",
 		minHeight: 0,
+		background: color.surface,
 	},
 	// Takes the leftover height and scrolls inside it.
-	sidebarScroll: { flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 12px" },
+	sidebarScroll: { flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 10px" },
 	// Capped so a long history cannot squeeze the workflow list out, and so the
 	// section is always on screen no matter how many workflows exist.
 	sidebarHistory: {
 		flexShrink: 0,
 		maxHeight: "45%",
 		overflowY: "auto",
-		padding: "12px",
-		borderTop: "1px solid #e2e8f0",
+		padding: "12px 10px",
+		borderTop: `1px solid ${color.border}`,
 	},
-	sidebarTitle: {
-		margin: "0 0 8px",
-		fontSize: 11,
-		textTransform: "uppercase",
-		letterSpacing: "0.06em",
-		color: "#64748b",
-	},
+	sidebarTitle: shared.sectionTitle,
 	list: { listStyle: "none", margin: 0, padding: 0 },
 	listButton: {
 		display: "flex",
@@ -575,27 +603,32 @@ const styles = {
 		alignItems: "flex-start",
 		gap: 2,
 		width: "100%",
-		padding: "8px 10px",
-		marginBottom: 2,
+		padding: "7px 9px",
+		marginBottom: 1,
 		border: "1px solid transparent",
 		borderRadius: 6,
 		background: "none",
 		font: "inherit",
 		textAlign: "left",
 		cursor: "pointer",
+		color: color.text,
+		transition: "background 120ms ease",
 	},
 	// Repeats the whole border rather than overriding borderColor alone: React warns
 	// when a shorthand and a longhand for the same property are mixed across renders,
 	// because which one wins depends on render order.
-	listButtonActive: { background: "#eef2ff", border: "1px solid #c7d2fe" },
-	wfName: { fontWeight: 600 },
-	wfMeta: { fontSize: 12, color: "#64748b" },
+	listButtonActive: {
+		background: color.accentSoft,
+		border: `1px solid ${color.accentBorder}`,
+	},
+	wfName: { fontWeight: 500, fontSize: 13, color: color.text },
+	wfMeta: { fontSize: 11, color: color.textFaint, fontFamily: font.mono },
 	runRow: { display: "flex", alignItems: "center", gap: 6 },
 	dot: {
-		width: 9,
-		height: 9,
+		width: 7,
+		height: 7,
 		borderRadius: "50%",
-		borderWidth: 1.5,
+		borderWidth: 1,
 		borderStyle: "solid",
 		display: "inline-block",
 		flexShrink: 0,
@@ -605,54 +638,39 @@ const styles = {
 		display: "flex",
 		alignItems: "center",
 		gap: 10,
-		padding: "10px 20px",
-		borderBottom: "1px solid #e2e8f0",
+		padding: "0 18px",
+		height: 46,
+		flexShrink: 0,
+		borderBottom: `1px solid ${color.border}`,
+		background: color.surface,
 	},
+	canvasName: { fontSize: 13.5, fontWeight: 600, color: color.text },
 	spacer: { flex: 1 },
-	canvasBody: { flex: 1, minHeight: 0, padding: 20, background: "#f8fafc" },
-	runSummary: { display: "flex", alignItems: "center", gap: 8 },
+	canvasBody: { flex: 1, minHeight: 0, padding: 22, background: color.canvas },
+	runSummary: { display: "flex", alignItems: "center", gap: 9 },
 	// Wraps rather than overflowing: a run mid-flight can be in four states at once,
 	// and the header must not push the buttons off the right edge.
-	counts: { display: "flex", flexWrap: "wrap", gap: "0 10px", fontSize: 12 },
+	counts: {
+		display: "flex",
+		flexWrap: "wrap",
+		gap: "0 10px",
+		fontSize: 11,
+		fontFamily: font.mono,
+	},
+	pill: shared.pill,
 	bar: {
 		display: "flex",
 		width: "100%",
-		height: 4,
+		height: 3,
 		borderRadius: 2,
 		overflow: "hidden",
-		margin: "3px 0 1px",
-		background: "#e2e8f0",
+		margin: "4px 0 2px",
+		background: color.raised,
 	},
-	pill: {
-		fontSize: 11,
-		fontWeight: 600,
-		padding: "1px 8px",
-		borderRadius: 999,
-		borderWidth: 1,
-		borderStyle: "solid",
-	},
-	primaryButton: {
-		padding: "6px 12px",
-		borderRadius: 6,
-		border: "1px solid #4f46e5",
-		background: "#4f46e5",
-		color: "#ffffff",
-		font: "inherit",
-		fontSize: 13,
-		cursor: "pointer",
-	},
-	secondaryButton: {
-		padding: "6px 12px",
-		borderRadius: 6,
-		border: "1px solid #cbd5e1",
-		background: "#ffffff",
-		color: "#0f172a",
-		font: "inherit",
-		fontSize: 13,
-		cursor: "pointer",
-	},
-	notice: { padding: 20, color: "#64748b" },
-	hint: { fontSize: 12, color: "#64748b" },
+	primaryButton: { ...shared.buttonBase, ...shared.primaryButton },
+	secondaryButton: { ...shared.buttonBase, ...shared.secondaryButton },
+	notice: { padding: 22, color: color.textFaint, fontSize: 13 },
+	hint: { fontSize: 11.5, color: color.textFaint, lineHeight: 1.6 },
 };
 
 // Find the mount point from index.html and hand it to React.

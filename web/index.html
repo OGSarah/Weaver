@@ -4,6 +4,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Weaver</title>
+    <style>
+        /*
+         * The only stylesheet in the project, and deliberately tiny: everything else
+         * is styled inline from web/src/theme.js, because esbuild is pointed at a
+         * single JSX entry and a CSS import would mean a second output file to link.
+         *
+         * What has to live here is what React cannot reach. The app renders into
+         * #root, so it can never style the elements above it, and those are exactly
+         * the ones that decide whether the page has a white border around it.
+         */
+
+        /* Tells the browser to render its own furniture dark: scrollbars, form
+           controls, and the flash of background before the bundle has parsed. */
+        :root {
+            color-scheme: dark;
+        }
+
+        /* The app lays itself out at height: 100vh. The default 8px body margin
+           would add to that and put a scrollbar on a page that exactly fits. */
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #0a0e15;
+        }
+
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Thin, low-contrast scrollbars, so the sidebar and log panel do not each
+           carry a bright chrome-coloured bar down their edge. */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #2c3849 transparent;
+        }
+        ::-webkit-scrollbar {
+            width: 9px;
+            height: 9px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #2c3849;
+            border-radius: 5px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #3d4a5d;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+    </style>
 </head>
 <body>
     <div id="root"></div>

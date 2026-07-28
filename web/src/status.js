@@ -16,14 +16,19 @@
 // failed and dead are deliberately different hues rather than two shades of red.
 // "will try again" and "has given up" are the single most important thing to be
 // able to tell apart at a glance, and they are one attempt apart in the data.
+//
+// Tuned for the dark surfaces in theme.js. The fills are translucent rather than
+// opaque so a node picks up the surface beneath it and the whole graph keeps one
+// depth, and the text is a light tint of the border colour, because the saturated
+// mid-tones that read well as a 1px border are too dim to read as 11px type.
 export const STATUS_COLORS = {
-	pending: { fill: "#f8fafc", stroke: "#cbd5e1", text: "#64748b" },
-	ready: { fill: "#eff6ff", stroke: "#3b82f6", text: "#1d4ed8" },
-	running: { fill: "#fffbeb", stroke: "#f59e0b", text: "#b45309" },
-	succeeded: { fill: "#f0fdf4", stroke: "#22c55e", text: "#15803d" },
-	failed: { fill: "#fff7ed", stroke: "#fb923c", text: "#c2410c" },
-	dead: { fill: "#fef2f2", stroke: "#dc2626", text: "#b91c1c" },
-	cancelled: { fill: "#f8fafc", stroke: "#94a3b8", text: "#64748b" },
+	pending: { fill: "rgba(148, 163, 184, 0.08)", stroke: "#475569", text: "#93a1b5" },
+	ready: { fill: "rgba(59, 130, 246, 0.14)", stroke: "#3b82f6", text: "#93c5fd" },
+	running: { fill: "rgba(245, 158, 11, 0.16)", stroke: "#f59e0b", text: "#fcd34d" },
+	succeeded: { fill: "rgba(34, 197, 94, 0.14)", stroke: "#22c55e", text: "#86efac" },
+	failed: { fill: "rgba(251, 146, 60, 0.16)", stroke: "#fb923c", text: "#fdba74" },
+	dead: { fill: "rgba(239, 68, 68, 0.16)", stroke: "#ef4444", text: "#fca5a5" },
+	cancelled: { fill: "rgba(100, 116, 139, 0.08)", stroke: "#64748b", text: "#8b98ab" },
 };
 
 // Legend order: roughly the order a task passes through them.
@@ -39,7 +44,7 @@ export const STATUS_ORDER = [
 
 // Fallback for a status the UI does not know about, so a future state added to the
 // schema renders as a plain node rather than crashing on an undefined lookup.
-const UNKNOWN = { fill: "#ffffff", stroke: "#cbd5e1", text: "#64748b" };
+const UNKNOWN = { fill: "rgba(148, 163, 184, 0.08)", stroke: "#475569", text: "#93a1b5" };
 
 export function statusColors(status) {
 	return STATUS_COLORS[status] ?? UNKNOWN;

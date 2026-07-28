@@ -4562,7 +4562,7 @@
         }
         function logRenderPhase(startTime, endTime, lanes, debugTask) {
           if (supportsUserTiming && !(endTime <= startTime)) {
-            var color = (lanes & 738197653) === lanes ? "tertiary-dark" : "primary-dark";
+            var color2 = (lanes & 738197653) === lanes ? "tertiary-dark" : "primary-dark";
             lanes = (lanes & 536870912) === lanes ? "Prepared" : (lanes & 201326741) === lanes ? "Hydrated" : "Render";
             debugTask ? debugTask.run(
               console.timeStamp.bind(
@@ -4572,7 +4572,7 @@
                 endTime,
                 currentTrack,
                 LANES_TRACK_GROUP,
-                color
+                color2
               )
             ) : console.timeStamp(
               lanes,
@@ -4580,7 +4580,7 @@
               endTime,
               currentTrack,
               LANES_TRACK_GROUP,
-              color
+              color2
             );
           }
         }
@@ -13398,7 +13398,7 @@
             else {
               var endTime = renderStartTime, debugTask = workInProgressUpdateTask;
               if (supportsUserTiming && !(endTime <= previousRenderStartTime)) {
-                var color = (lanes & 738197653) === lanes ? "tertiary-dark" : "primary-dark", label = (lanes & 536870912) === lanes ? "Prewarm" : (lanes & 201326741) === lanes ? "Interrupted Hydration" : "Interrupted Render";
+                var color2 = (lanes & 738197653) === lanes ? "tertiary-dark" : "primary-dark", label = (lanes & 536870912) === lanes ? "Prewarm" : (lanes & 201326741) === lanes ? "Interrupted Hydration" : "Interrupted Render";
                 debugTask ? debugTask.run(
                   console.timeStamp.bind(
                     console,
@@ -13407,7 +13407,7 @@
                     endTime,
                     currentTrack,
                     LANES_TRACK_GROUP,
-                    color
+                    color2
                   )
                 ) : console.timeStamp(
                   label,
@@ -13415,7 +13415,7 @@
                   endTime,
                   currentTrack,
                   LANES_TRACK_GROUP,
-                  color
+                  color2
                 );
               }
             }
@@ -13427,18 +13427,18 @@
             workInProgressUpdateTask = blockingUpdateTask;
             debugTask = 0 <= blockingUpdateTime && blockingUpdateTime < blockingClampTime ? blockingClampTime : blockingUpdateTime;
             endTime = 0 <= blockingEventTime && blockingEventTime < blockingClampTime ? blockingClampTime : blockingEventTime;
-            color = 0 <= endTime ? endTime : 0 <= debugTask ? debugTask : renderStartTime;
+            color2 = 0 <= endTime ? endTime : 0 <= debugTask ? debugTask : renderStartTime;
             0 <= blockingSuspendedTime ? (setCurrentTrackFromLanes(2), logSuspendedWithDelayPhase(
               blockingSuspendedTime,
-              color,
+              color2,
               lanes,
               previousRenderStartTime
-            )) : 0 !== (animatingLanes & 127) && (setCurrentTrackFromLanes(2), logAnimatingPhase(blockingClampTime, color, animatingTask));
+            )) : 0 !== (animatingLanes & 127) && (setCurrentTrackFromLanes(2), logAnimatingPhase(blockingClampTime, color2, animatingTask));
             previousRenderStartTime = debugTask;
             var eventTime = endTime, eventType = blockingEventType, eventIsRepeat = 0 < blockingEventRepeatTime, isSpawnedUpdate = blockingUpdateType === SPAWNED_UPDATE, isPingedUpdate = blockingUpdateType === PINGED_UPDATE;
             debugTask = renderStartTime;
             endTime = blockingUpdateTask;
-            color = blockingUpdateMethodName;
+            color2 = blockingUpdateMethodName;
             label = blockingUpdateComponentName;
             if (supportsUserTiming) {
               currentTrack = "Blocking";
@@ -13465,7 +13465,7 @@
                   color$jscomp$0
                 );
               }
-              debugTask > previousRenderStartTime && (eventTime = isSpawnedUpdate ? "error" : (lanes & 738197653) === lanes ? "tertiary-light" : "primary-light", isSpawnedUpdate = isPingedUpdate ? "Promise Resolved" : isSpawnedUpdate ? "Cascading Update" : 5 < debugTask - previousRenderStartTime ? "Update Blocked" : "Update", isPingedUpdate = [], null != label && isPingedUpdate.push(["Component name", label]), null != color && isPingedUpdate.push(["Method name", color]), previousRenderStartTime = {
+              debugTask > previousRenderStartTime && (eventTime = isSpawnedUpdate ? "error" : (lanes & 738197653) === lanes ? "tertiary-light" : "primary-light", isSpawnedUpdate = isPingedUpdate ? "Promise Resolved" : isSpawnedUpdate ? "Cascading Update" : 5 < debugTask - previousRenderStartTime ? "Update Blocked" : "Update", isPingedUpdate = [], null != label && isPingedUpdate.push(["Component name", label]), null != color2 && isPingedUpdate.push(["Method name", color2]), previousRenderStartTime = {
                 start: previousRenderStartTime,
                 end: debugTask,
                 detail: {
@@ -13492,12 +13492,12 @@
             blockingEventTime = -1.1;
             blockingClampTime = now();
           }
-          0 !== (lanes & 4194048) && (workInProgressUpdateTask = transitionUpdateTask, debugTask = 0 <= transitionStartTime && transitionStartTime < transitionClampTime ? transitionClampTime : transitionStartTime, previousRenderStartTime = 0 <= transitionUpdateTime && transitionUpdateTime < transitionClampTime ? transitionClampTime : transitionUpdateTime, endTime = 0 <= transitionEventTime && transitionEventTime < transitionClampTime ? transitionClampTime : transitionEventTime, color = 0 <= endTime ? endTime : 0 <= previousRenderStartTime ? previousRenderStartTime : renderStartTime, 0 <= transitionSuspendedTime ? (setCurrentTrackFromLanes(256), logSuspendedWithDelayPhase(
+          0 !== (lanes & 4194048) && (workInProgressUpdateTask = transitionUpdateTask, debugTask = 0 <= transitionStartTime && transitionStartTime < transitionClampTime ? transitionClampTime : transitionStartTime, previousRenderStartTime = 0 <= transitionUpdateTime && transitionUpdateTime < transitionClampTime ? transitionClampTime : transitionUpdateTime, endTime = 0 <= transitionEventTime && transitionEventTime < transitionClampTime ? transitionClampTime : transitionEventTime, color2 = 0 <= endTime ? endTime : 0 <= previousRenderStartTime ? previousRenderStartTime : renderStartTime, 0 <= transitionSuspendedTime ? (setCurrentTrackFromLanes(256), logSuspendedWithDelayPhase(
             transitionSuspendedTime,
-            color,
+            color2,
             lanes,
             workInProgressUpdateTask
-          )) : 0 !== (animatingLanes & 4194048) && (setCurrentTrackFromLanes(256), logAnimatingPhase(transitionClampTime, color, animatingTask)), isPingedUpdate = endTime, eventTime = transitionEventType, eventType = 0 < transitionEventRepeatTime, eventIsRepeat = transitionUpdateType === PINGED_UPDATE, color = renderStartTime, endTime = transitionUpdateTask, label = transitionUpdateMethodName, isSpawnedUpdate = transitionUpdateComponentName, supportsUserTiming && (currentTrack = "Transition", 0 < previousRenderStartTime ? previousRenderStartTime > color && (previousRenderStartTime = color) : previousRenderStartTime = color, 0 < debugTask ? debugTask > previousRenderStartTime && (debugTask = previousRenderStartTime) : debugTask = previousRenderStartTime, 0 < isPingedUpdate ? isPingedUpdate > debugTask && (isPingedUpdate = debugTask) : isPingedUpdate = debugTask, debugTask > isPingedUpdate && null !== eventTime && (color$jscomp$0 = eventType ? "secondary-light" : "warning", endTime ? endTime.run(
+          )) : 0 !== (animatingLanes & 4194048) && (setCurrentTrackFromLanes(256), logAnimatingPhase(transitionClampTime, color2, animatingTask)), isPingedUpdate = endTime, eventTime = transitionEventType, eventType = 0 < transitionEventRepeatTime, eventIsRepeat = transitionUpdateType === PINGED_UPDATE, color2 = renderStartTime, endTime = transitionUpdateTask, label = transitionUpdateMethodName, isSpawnedUpdate = transitionUpdateComponentName, supportsUserTiming && (currentTrack = "Transition", 0 < previousRenderStartTime ? previousRenderStartTime > color2 && (previousRenderStartTime = color2) : previousRenderStartTime = color2, 0 < debugTask ? debugTask > previousRenderStartTime && (debugTask = previousRenderStartTime) : debugTask = previousRenderStartTime, 0 < isPingedUpdate ? isPingedUpdate > debugTask && (isPingedUpdate = debugTask) : isPingedUpdate = debugTask, debugTask > isPingedUpdate && null !== eventTime && (color$jscomp$0 = eventType ? "secondary-light" : "warning", endTime ? endTime.run(
             console.timeStamp.bind(
               console,
               eventType ? "Consecutive" : "Event: " + eventTime,
@@ -13531,9 +13531,9 @@
             currentTrack,
             LANES_TRACK_GROUP,
             "primary-dark"
-          )), color > previousRenderStartTime && (debugTask = eventIsRepeat ? "Promise Resolved" : 5 < color - previousRenderStartTime ? "Update Blocked" : "Update", isPingedUpdate = [], null != isSpawnedUpdate && isPingedUpdate.push(["Component name", isSpawnedUpdate]), null != label && isPingedUpdate.push(["Method name", label]), previousRenderStartTime = {
+          )), color2 > previousRenderStartTime && (debugTask = eventIsRepeat ? "Promise Resolved" : 5 < color2 - previousRenderStartTime ? "Update Blocked" : "Update", isPingedUpdate = [], null != isSpawnedUpdate && isPingedUpdate.push(["Component name", isSpawnedUpdate]), null != label && isPingedUpdate.push(["Method name", label]), previousRenderStartTime = {
             start: previousRenderStartTime,
-            end: color,
+            end: color2,
             detail: {
               devtools: {
                 properties: isPingedUpdate,
@@ -13576,7 +13576,7 @@
           endTime = root3.entangledLanes;
           if (0 !== endTime)
             for (root3 = root3.entanglements, endTime &= lanes; 0 < endTime; )
-              debugTask = 31 - clz32(endTime), color = 1 << debugTask, lanes |= root3[debugTask], endTime &= ~color;
+              debugTask = 31 - clz32(endTime), color2 = 1 << debugTask, lanes |= root3[debugTask], endTime &= ~color2;
           entangledRenderLanes = lanes;
           finishQueueingConcurrentUpdates();
           root3 = getCurrentTime();
@@ -23159,13 +23159,13 @@
 
   // src/status.js
   var STATUS_COLORS = {
-    pending: { fill: "#f8fafc", stroke: "#cbd5e1", text: "#64748b" },
-    ready: { fill: "#eff6ff", stroke: "#3b82f6", text: "#1d4ed8" },
-    running: { fill: "#fffbeb", stroke: "#f59e0b", text: "#b45309" },
-    succeeded: { fill: "#f0fdf4", stroke: "#22c55e", text: "#15803d" },
-    failed: { fill: "#fff7ed", stroke: "#fb923c", text: "#c2410c" },
-    dead: { fill: "#fef2f2", stroke: "#dc2626", text: "#b91c1c" },
-    cancelled: { fill: "#f8fafc", stroke: "#94a3b8", text: "#64748b" }
+    pending: { fill: "rgba(148, 163, 184, 0.08)", stroke: "#475569", text: "#93a1b5" },
+    ready: { fill: "rgba(59, 130, 246, 0.14)", stroke: "#3b82f6", text: "#93c5fd" },
+    running: { fill: "rgba(245, 158, 11, 0.16)", stroke: "#f59e0b", text: "#fcd34d" },
+    succeeded: { fill: "rgba(34, 197, 94, 0.14)", stroke: "#22c55e", text: "#86efac" },
+    failed: { fill: "rgba(251, 146, 60, 0.16)", stroke: "#fb923c", text: "#fdba74" },
+    dead: { fill: "rgba(239, 68, 68, 0.16)", stroke: "#ef4444", text: "#fca5a5" },
+    cancelled: { fill: "rgba(100, 116, 139, 0.08)", stroke: "#64748b", text: "#8b98ab" }
   };
   var STATUS_ORDER = [
     "pending",
@@ -23176,7 +23176,7 @@
     "dead",
     "cancelled"
   ];
-  var UNKNOWN = { fill: "#ffffff", stroke: "#cbd5e1", text: "#64748b" };
+  var UNKNOWN = { fill: "rgba(148, 163, 184, 0.08)", stroke: "#475569", text: "#93a1b5" };
   function statusColors(status) {
     return STATUS_COLORS[status] ?? UNKNOWN;
   }
@@ -23198,11 +23198,88 @@
     return TERMINAL_RUN_STATUSES.has(status);
   }
 
+  // src/theme.js
+  var color = {
+    // Three background layers, not one. Depth is what stops a dark interface from
+    // reading as a flat void: the page sits furthest back, panels come forward, and
+    // the graph canvas is recessed so the nodes drawn on it feel placed on a
+    // surface rather than floating.
+    bg: "#0a0e15",
+    surface: "#111823",
+    canvas: "#0c1119",
+    raised: "#1b2431",
+    raisedHover: "#212c3b",
+    border: "#1e2836",
+    borderStrong: "#2c3849",
+    // Text steps down in three stages. Anything below textFaint stops being legible
+    // on these backgrounds, which is why there is no fourth.
+    text: "#e6ebf2",
+    textMuted: "#93a1b5",
+    textFaint: "#66768d",
+    accent: "#6366f1",
+    accentHover: "#7679f3",
+    accentBorder: "#4f46e5",
+    accentSoft: "rgba(99, 102, 241, 0.14)",
+    danger: "#f87171",
+    dangerSoft: "rgba(248, 113, 113, 0.12)",
+    dangerBorder: "rgba(248, 113, 113, 0.35)",
+    warn: "#fbbf24"
+  };
+  var font = {
+    sans: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif',
+    mono: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace'
+  };
+  var shared = {
+    // The small uppercase label above each region.
+    sectionTitle: {
+      margin: "0 0 8px",
+      fontSize: 10,
+      fontWeight: 600,
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      color: color.textFaint
+    },
+    // Status chips. The caller supplies the three colours from the status palette;
+    // this is only the shape.
+    pill: {
+      display: "inline-block",
+      fontSize: 11,
+      fontWeight: 600,
+      padding: "2px 9px",
+      borderRadius: 999,
+      borderWidth: 1,
+      borderStyle: "solid",
+      letterSpacing: "0.01em"
+    },
+    buttonBase: {
+      font: "inherit",
+      fontSize: 12.5,
+      fontWeight: 500,
+      padding: "6px 13px",
+      borderRadius: 6,
+      cursor: "pointer",
+      // Transitions are short enough to feel like feedback rather than animation.
+      transition: "background 120ms ease, border-color 120ms ease"
+    },
+    primaryButton: {
+      border: `1px solid ${color.accentBorder}`,
+      background: color.accent,
+      color: "#ffffff"
+    },
+    secondaryButton: {
+      border: `1px solid ${color.borderStrong}`,
+      background: "transparent",
+      color: color.textMuted
+    }
+  };
+
   // src/Dag.jsx
-  var NODE_RADIUS = 6;
-  var EDGE_COLOR = "#94a3b8";
-  var ROOT_COLOR = "#6366f1";
-  var NODE_BORDER = "#cbd5e1";
+  var NODE_RADIUS = 7;
+  var MAX_SCALE = 1.35;
+  var EDGE_COLOR = "#3d4a5d";
+  var ROOT_COLOR = color.accent;
+  var NODE_BORDER = color.borderStrong;
+  var NODE_FILL = color.surface;
   function Dag({ tasks, selectedId, onSelect }) {
     const topologyKey = (0, import_react.useMemo)(
       () => tasks.map((t) => `${t.id}:${(t.dependsOn ?? []).join(",")}`).join("|"),
@@ -23218,7 +23295,11 @@
       {
         viewBox: `0 0 ${width} ${height}`,
         preserveAspectRatio: "xMidYMid meet",
-        style: { ...styles.svg, maxWidth: width, maxHeight: height },
+        style: {
+          ...styles.svg,
+          maxWidth: width * MAX_SCALE,
+          maxHeight: height * MAX_SCALE
+        },
         role: "img",
         "aria-label": "Workflow dependency graph"
       },
@@ -23266,9 +23347,9 @@
     const { status } = task;
     const isRoot = (task.dependsOn ?? []).length === 0;
     const colors = status ? statusColors(status) : null;
-    const fill = colors ? colors.fill : "#ffffff";
+    const fill = colors ? colors.fill : NODE_FILL;
     const stroke = colors ? colors.stroke : isRoot ? ROOT_COLOR : NODE_BORDER;
-    const strokeWidth = colors ? 2 : isRoot ? 2 : 1.5;
+    const strokeWidth = colors ? 1.5 : isRoot ? 1.5 : 1;
     const sublabel = status ?? task.handler;
     const showAttempt = (task.attempt ?? 0) > 1;
     return /* @__PURE__ */ import_react.default.createElement(
@@ -23294,8 +23375,20 @@
           height: height + 8,
           rx: NODE_RADIUS + 3,
           fill: "none",
-          stroke: "#4f46e5",
-          strokeWidth: "2"
+          stroke: color.accent,
+          strokeWidth: "1.5",
+          opacity: "0.9"
+        }
+      ),
+      /* @__PURE__ */ import_react.default.createElement(
+        "rect",
+        {
+          x: x2,
+          y,
+          width,
+          height,
+          rx: NODE_RADIUS,
+          fill: NODE_FILL
         }
       ),
       /* @__PURE__ */ import_react.default.createElement(
@@ -23325,11 +23418,12 @@
         "text",
         {
           x: x2 + width / 2,
-          y: y + 22,
+          y: y + 23,
           textAnchor: "middle",
           fontSize: "13",
           fontWeight: "600",
-          fill: "#0f172a"
+          fill: color.text,
+          style: { letterSpacing: "-0.01em" }
         },
         task.id
       ),
@@ -23339,13 +23433,27 @@
           x: x2 + width / 2,
           y: y + 40,
           textAnchor: "middle",
-          fontSize: "11",
+          fontSize: "10.5",
           fontWeight: status ? 600 : 400,
-          fill: colors ? colors.text : "#64748b"
+          fill: colors ? colors.text : color.textMuted,
+          style: status ? { letterSpacing: "0.04em" } : { fontFamily: font.mono }
         },
-        sublabel
+        status ? sublabel.toUpperCase() : sublabel
       ),
-      showAttempt && /* @__PURE__ */ import_react.default.createElement("text", { x: x2 + width - 8, y: y + 14, textAnchor: "end", fontSize: "9", fill: "#94a3b8" }, "try ", task.attempt, "/", task.maxAttempts),
+      showAttempt && /* @__PURE__ */ import_react.default.createElement(
+        "text",
+        {
+          x: x2 + width - 9,
+          y: y + 15,
+          textAnchor: "end",
+          fontSize: "9",
+          fontFamily: font.mono,
+          fill: color.textFaint
+        },
+        task.attempt,
+        "/",
+        task.maxAttempts
+      ),
       task.error && /* @__PURE__ */ import_react.default.createElement("title", null, task.error)
     );
   }
@@ -23361,7 +23469,7 @@
             borderColor: c.stroke
           }
         }
-      ), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: c.text } }, status));
+      ), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: c.text, textTransform: "uppercase" } }, status));
     }));
   }
   var styles = {
@@ -23378,25 +23486,26 @@
       display: "block"
     },
     empty: {
-      color: "#64748b",
-      fontStyle: "italic"
+      color: color.textFaint
     },
     legend: {
       display: "flex",
       flexWrap: "wrap",
-      gap: "4px 14px",
+      gap: "5px 16px",
       listStyle: "none",
       margin: 0,
-      padding: "8px 20px",
-      fontSize: 11,
-      borderTop: "1px solid #e2e8f0"
+      padding: "9px 20px",
+      fontSize: 10.5,
+      letterSpacing: "0.03em",
+      borderTop: `1px solid ${color.border}`,
+      background: color.surface
     },
-    legendItem: { display: "flex", alignItems: "center", gap: 5 },
+    legendItem: { display: "flex", alignItems: "center", gap: 6 },
     swatch: {
-      width: 11,
-      height: 11,
-      borderRadius: 3,
-      borderWidth: 1.5,
+      width: 9,
+      height: 9,
+      borderRadius: 2,
+      borderWidth: 1,
       borderStyle: "solid",
       display: "inline-block"
     }
@@ -23412,10 +23521,16 @@
     return /* @__PURE__ */ import_react2.default.createElement("dl", { style: styles2.facts }, /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Status" }, /* @__PURE__ */ import_react2.default.createElement(
       "span",
       {
-        style: { ...styles2.pill, background: c.fill, borderColor: c.stroke, color: c.text }
+        style: {
+          ...styles2.pill,
+          background: c.fill,
+          borderColor: c.stroke,
+          color: c.text,
+          textTransform: "uppercase"
+        }
       },
       task.status
-    )), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Handler" }, /* @__PURE__ */ import_react2.default.createElement("code", null, task.handler)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Attempt" }, task.attempt, " of ", task.maxAttempts), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Timeout" }, task.timeoutSeconds, "s"), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Scheduled" }, formatTime(task.scheduledAt)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Started" }, formatTime(task.startedAt)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Finished" }, formatTime(task.finishedAt)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Duration" }, duration(task.startedAt, task.finishedAt)));
+    )), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Handler" }, /* @__PURE__ */ import_react2.default.createElement("code", { style: styles2.inlineCode }, task.handler)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Attempt" }, task.attempt, " of ", task.maxAttempts), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Timeout" }, task.timeoutSeconds, "s"), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Scheduled" }, formatTime(task.scheduledAt)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Started" }, formatTime(task.startedAt)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Finished" }, formatTime(task.finishedAt)), /* @__PURE__ */ import_react2.default.createElement(Fact, { label: "Duration" }, duration(task.startedAt, task.finishedAt)));
   }
   function Fact({ label, children }) {
     return /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("dt", { style: styles2.factLabel }, label), /* @__PURE__ */ import_react2.default.createElement("dd", { style: styles2.factValue }, children));
@@ -23454,96 +23569,94 @@
   }
   var styles2 = {
     panel: {
-      width: 360,
-      borderLeft: "1px solid #e2e8f0",
+      width: 380,
+      flexShrink: 0,
+      borderLeft: `1px solid ${color.border}`,
       display: "flex",
       flexDirection: "column",
       minHeight: 0,
-      background: "#ffffff"
+      background: color.surface
     },
     header: {
       display: "flex",
       alignItems: "center",
       gap: 8,
-      padding: "10px 14px",
-      borderBottom: "1px solid #e2e8f0"
+      padding: "11px 16px",
+      borderBottom: `1px solid ${color.border}`,
+      flexShrink: 0
     },
-    title: { flex: 1, fontSize: 14 },
+    title: { flex: 1, fontSize: 13.5, color: color.text, fontFamily: font.mono },
     close: {
       border: "none",
       background: "none",
-      fontSize: 20,
+      fontSize: 18,
       lineHeight: 1,
       cursor: "pointer",
-      color: "#64748b",
-      padding: 0
+      color: color.textFaint,
+      padding: "0 2px"
     },
     // The panel scrolls on its own; a long log must not stretch the page.
-    body: { overflowY: "auto", padding: "12px 14px", fontSize: 13 },
+    body: { overflowY: "auto", padding: "14px 16px", fontSize: 12.5 },
     facts: {
       display: "grid",
       gridTemplateColumns: "auto 1fr",
-      gap: "4px 12px",
-      margin: "0 0 14px",
+      gap: "6px 14px",
+      margin: "0 0 16px",
       alignItems: "baseline"
     },
-    factLabel: { color: "#64748b", fontSize: 12 },
-    factValue: { margin: 0, wordBreak: "break-word" },
-    pill: {
-      fontSize: 11,
-      fontWeight: 600,
-      padding: "1px 8px",
-      borderRadius: 999,
-      borderWidth: 1,
-      borderStyle: "solid"
-    },
-    sectionTitle: {
-      fontSize: 11,
-      textTransform: "uppercase",
-      letterSpacing: "0.06em",
-      color: "#64748b",
-      margin: "0 0 6px"
-    },
+    factLabel: { color: color.textFaint, fontSize: 11 },
+    factValue: { margin: 0, wordBreak: "break-word", color: color.text },
+    pill: shared.pill,
+    sectionTitle: shared.sectionTitle,
+    inlineCode: { fontFamily: font.mono, fontSize: 11.5, color: color.textMuted },
     error: {
-      margin: "0 0 14px",
-      padding: 8,
-      background: "#fef2f2",
-      color: "#b91c1c",
-      borderRadius: 4,
-      fontSize: 12,
+      margin: "0 0 16px",
+      padding: "8px 10px",
+      background: color.dangerSoft,
+      color: color.danger,
+      border: `1px solid ${color.dangerBorder}`,
+      borderRadius: 5,
+      fontSize: 11.5,
+      fontFamily: font.mono,
       whiteSpace: "pre-wrap",
       wordBreak: "break-word"
     },
     code: {
-      margin: "0 0 14px",
-      padding: 8,
-      background: "#f8fafc",
-      borderRadius: 4,
-      fontSize: 12,
+      margin: "0 0 16px",
+      padding: "8px 10px",
+      background: color.bg,
+      border: `1px solid ${color.border}`,
+      borderRadius: 5,
+      fontSize: 11.5,
+      fontFamily: font.mono,
+      color: color.textMuted,
       overflowX: "auto"
     },
-    attemptGroup: { marginBottom: 10 },
+    attemptGroup: { marginBottom: 12 },
     attemptLabel: {
-      fontSize: 11,
+      fontSize: 10,
       fontWeight: 600,
-      color: "#475569",
-      borderTop: "1px solid #e2e8f0",
-      paddingTop: 4,
-      marginBottom: 2
+      textTransform: "uppercase",
+      letterSpacing: "0.08em",
+      color: color.textFaint,
+      borderTop: `1px solid ${color.border}`,
+      paddingTop: 6,
+      marginBottom: 4
     },
     log: { listStyle: "none", margin: 0, padding: 0 },
     logLine: {
       display: "flex",
-      gap: 8,
-      fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+      gap: 10,
+      fontFamily: font.mono,
       fontSize: 11,
-      lineHeight: 1.6,
-      wordBreak: "break-word"
+      lineHeight: 1.65,
+      wordBreak: "break-word",
+      color: color.textMuted
     },
-    logTime: { color: "#94a3b8", flexShrink: 0 },
-    logError: { color: "#b91c1c" },
-    truncated: { fontSize: 11, color: "#b45309", margin: "0 0 6px" },
-    muted: { color: "#64748b", padding: "0 0 8px" }
+    logTime: { color: color.textFaint, flexShrink: 0, opacity: 0.75 },
+    logError: { color: color.danger },
+    truncated: { fontSize: 11, color: color.warn, margin: "0 0 8px" },
+    muted: { color: color.textFaint, padding: "0 0 8px" }
   };
 
   // src/main.jsx
@@ -23694,7 +23807,7 @@
     }
     const showingRun = Boolean(runId);
     const tasks = showingRun ? runTasks : detail?.tasks;
-    return /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.page }, /* @__PURE__ */ import_react3.default.createElement("header", { style: styles3.header }, /* @__PURE__ */ import_react3.default.createElement("h1", { style: styles3.title }, "Weaver")), error && /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.errorBar }, error, /* @__PURE__ */ import_react3.default.createElement("button", { onClick: () => setError(null), style: styles3.dismiss }, "dismiss")), /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.body }, /* @__PURE__ */ import_react3.default.createElement("nav", { style: styles3.sidebar }, /* @__PURE__ */ import_react3.default.createElement("section", { style: styles3.sidebarScroll }, /* @__PURE__ */ import_react3.default.createElement("h2", { style: styles3.sidebarTitle }, "Workflows"), workflows.length === 0 && /* @__PURE__ */ import_react3.default.createElement("p", { style: styles3.hint }, "No workflows registered. POST one to ", /* @__PURE__ */ import_react3.default.createElement("code", null, "/api/workflows"), "."), /* @__PURE__ */ import_react3.default.createElement("ul", { style: styles3.list }, workflows.map((wf) => /* @__PURE__ */ import_react3.default.createElement("li", { key: wf.id }, /* @__PURE__ */ import_react3.default.createElement(
+    return /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.page }, /* @__PURE__ */ import_react3.default.createElement("header", { style: styles3.header }, /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.logo }, "W"), /* @__PURE__ */ import_react3.default.createElement("h1", { style: styles3.title }, "Weaver"), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.spacer }), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfMeta }, workflows.length, " workflow", workflows.length === 1 ? "" : "s")), error && /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.errorBar }, error, /* @__PURE__ */ import_react3.default.createElement("button", { onClick: () => setError(null), style: styles3.dismiss }, "dismiss")), /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.body }, /* @__PURE__ */ import_react3.default.createElement("nav", { style: styles3.sidebar }, /* @__PURE__ */ import_react3.default.createElement("section", { style: styles3.sidebarScroll }, /* @__PURE__ */ import_react3.default.createElement("h2", { style: styles3.sidebarTitle }, "Workflows"), workflows.length === 0 && /* @__PURE__ */ import_react3.default.createElement("p", { style: styles3.hint }, "No workflows registered. POST one to ", /* @__PURE__ */ import_react3.default.createElement("code", null, "/api/workflows"), "."), /* @__PURE__ */ import_react3.default.createElement("ul", { style: styles3.list }, workflows.map((wf) => /* @__PURE__ */ import_react3.default.createElement("li", { key: wf.id }, /* @__PURE__ */ import_react3.default.createElement(
       "button",
       {
         onClick: () => setSelectedId(wf.id),
@@ -23714,7 +23827,7 @@
         latestVersion: detail?.version,
         openRunLive: run ? { status: run.status, counts: countByStatus(run.tasks) } : null
       }
-    ))), /* @__PURE__ */ import_react3.default.createElement("main", { style: styles3.canvas }, detail ? /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.canvasHeader }, /* @__PURE__ */ import_react3.default.createElement("strong", null, detail.name), showingRun ? /* @__PURE__ */ import_react3.default.createElement(RunSummary, { run }) : /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfMeta }, detail.tasks.length, " task", detail.tasks.length === 1 ? "" : "s"), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.spacer }), showingRun && /* @__PURE__ */ import_react3.default.createElement(
+    ))), /* @__PURE__ */ import_react3.default.createElement("main", { style: styles3.canvas }, detail ? /* @__PURE__ */ import_react3.default.createElement(import_react3.default.Fragment, null, /* @__PURE__ */ import_react3.default.createElement("div", { style: styles3.canvasHeader }, /* @__PURE__ */ import_react3.default.createElement("strong", { style: styles3.canvasName }, detail.name), showingRun ? /* @__PURE__ */ import_react3.default.createElement(RunSummary, { run }) : /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.wfMeta }, detail.tasks.length, " task", detail.tasks.length === 1 ? "" : "s"), /* @__PURE__ */ import_react3.default.createElement("span", { style: styles3.spacer }), showingRun && /* @__PURE__ */ import_react3.default.createElement(
       "button",
       {
         onClick: () => {
@@ -23821,31 +23934,58 @@
   }
   var styles3 = {
     page: {
-      font: "14px/1.5 system-ui, -apple-system, sans-serif",
-      color: "#0f172a",
+      font: `14px/1.5 ${font.sans}`,
+      color: color.text,
+      background: color.bg,
       height: "100vh",
       display: "flex",
       flexDirection: "column"
     },
     header: {
-      padding: "12px 20px",
-      borderBottom: "1px solid #e2e8f0"
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "0 18px",
+      height: 46,
+      flexShrink: 0,
+      borderBottom: `1px solid ${color.border}`,
+      background: color.surface
     },
-    title: { margin: 0, fontSize: 18 },
+    title: {
+      margin: 0,
+      fontSize: 14,
+      fontWeight: 600,
+      letterSpacing: "0.02em",
+      color: color.text
+    },
+    // A small mark so the header is not just a word in the corner.
+    logo: {
+      width: 18,
+      height: 18,
+      borderRadius: 5,
+      background: color.accent,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#fff"
+    },
     errorBar: {
       display: "flex",
       alignItems: "center",
       gap: 10,
-      padding: "8px 20px",
-      background: "#fef2f2",
-      color: "#b91c1c",
-      borderBottom: "1px solid #fecaca",
-      fontSize: 13
+      padding: "8px 18px",
+      background: color.dangerSoft,
+      color: color.danger,
+      borderBottom: `1px solid ${color.dangerBorder}`,
+      fontSize: 12.5,
+      flexShrink: 0
     },
     dismiss: {
       border: "none",
       background: "none",
-      color: "#b91c1c",
+      color: color.danger,
       textDecoration: "underline",
       cursor: "pointer",
       font: "inherit"
@@ -23855,31 +23995,26 @@
     // lets a flex child actually shrink instead of overflowing its parent.
     body: { display: "flex", flex: 1, minHeight: 0 },
     sidebar: {
-      width: 240,
+      width: 244,
       flexShrink: 0,
-      borderRight: "1px solid #e2e8f0",
+      borderRight: `1px solid ${color.border}`,
       display: "flex",
       flexDirection: "column",
-      minHeight: 0
+      minHeight: 0,
+      background: color.surface
     },
     // Takes the leftover height and scrolls inside it.
-    sidebarScroll: { flex: 1, minHeight: 0, overflowY: "auto", padding: "16px 12px" },
+    sidebarScroll: { flex: 1, minHeight: 0, overflowY: "auto", padding: "14px 10px" },
     // Capped so a long history cannot squeeze the workflow list out, and so the
     // section is always on screen no matter how many workflows exist.
     sidebarHistory: {
       flexShrink: 0,
       maxHeight: "45%",
       overflowY: "auto",
-      padding: "12px",
-      borderTop: "1px solid #e2e8f0"
+      padding: "12px 10px",
+      borderTop: `1px solid ${color.border}`
     },
-    sidebarTitle: {
-      margin: "0 0 8px",
-      fontSize: 11,
-      textTransform: "uppercase",
-      letterSpacing: "0.06em",
-      color: "#64748b"
-    },
+    sidebarTitle: shared.sectionTitle,
     list: { listStyle: "none", margin: 0, padding: 0 },
     listButton: {
       display: "flex",
@@ -23887,27 +24022,32 @@
       alignItems: "flex-start",
       gap: 2,
       width: "100%",
-      padding: "8px 10px",
-      marginBottom: 2,
+      padding: "7px 9px",
+      marginBottom: 1,
       border: "1px solid transparent",
       borderRadius: 6,
       background: "none",
       font: "inherit",
       textAlign: "left",
-      cursor: "pointer"
+      cursor: "pointer",
+      color: color.text,
+      transition: "background 120ms ease"
     },
     // Repeats the whole border rather than overriding borderColor alone: React warns
     // when a shorthand and a longhand for the same property are mixed across renders,
     // because which one wins depends on render order.
-    listButtonActive: { background: "#eef2ff", border: "1px solid #c7d2fe" },
-    wfName: { fontWeight: 600 },
-    wfMeta: { fontSize: 12, color: "#64748b" },
+    listButtonActive: {
+      background: color.accentSoft,
+      border: `1px solid ${color.accentBorder}`
+    },
+    wfName: { fontWeight: 500, fontSize: 13, color: color.text },
+    wfMeta: { fontSize: 11, color: color.textFaint, fontFamily: font.mono },
     runRow: { display: "flex", alignItems: "center", gap: 6 },
     dot: {
-      width: 9,
-      height: 9,
+      width: 7,
+      height: 7,
       borderRadius: "50%",
-      borderWidth: 1.5,
+      borderWidth: 1,
       borderStyle: "solid",
       display: "inline-block",
       flexShrink: 0
@@ -23917,54 +24057,39 @@
       display: "flex",
       alignItems: "center",
       gap: 10,
-      padding: "10px 20px",
-      borderBottom: "1px solid #e2e8f0"
+      padding: "0 18px",
+      height: 46,
+      flexShrink: 0,
+      borderBottom: `1px solid ${color.border}`,
+      background: color.surface
     },
+    canvasName: { fontSize: 13.5, fontWeight: 600, color: color.text },
     spacer: { flex: 1 },
-    canvasBody: { flex: 1, minHeight: 0, padding: 20, background: "#f8fafc" },
-    runSummary: { display: "flex", alignItems: "center", gap: 8 },
+    canvasBody: { flex: 1, minHeight: 0, padding: 22, background: color.canvas },
+    runSummary: { display: "flex", alignItems: "center", gap: 9 },
     // Wraps rather than overflowing: a run mid-flight can be in four states at once,
     // and the header must not push the buttons off the right edge.
-    counts: { display: "flex", flexWrap: "wrap", gap: "0 10px", fontSize: 12 },
+    counts: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: "0 10px",
+      fontSize: 11,
+      fontFamily: font.mono
+    },
+    pill: shared.pill,
     bar: {
       display: "flex",
       width: "100%",
-      height: 4,
+      height: 3,
       borderRadius: 2,
       overflow: "hidden",
-      margin: "3px 0 1px",
-      background: "#e2e8f0"
+      margin: "4px 0 2px",
+      background: color.raised
     },
-    pill: {
-      fontSize: 11,
-      fontWeight: 600,
-      padding: "1px 8px",
-      borderRadius: 999,
-      borderWidth: 1,
-      borderStyle: "solid"
-    },
-    primaryButton: {
-      padding: "6px 12px",
-      borderRadius: 6,
-      border: "1px solid #4f46e5",
-      background: "#4f46e5",
-      color: "#ffffff",
-      font: "inherit",
-      fontSize: 13,
-      cursor: "pointer"
-    },
-    secondaryButton: {
-      padding: "6px 12px",
-      borderRadius: 6,
-      border: "1px solid #cbd5e1",
-      background: "#ffffff",
-      color: "#0f172a",
-      font: "inherit",
-      fontSize: 13,
-      cursor: "pointer"
-    },
-    notice: { padding: 20, color: "#64748b" },
-    hint: { fontSize: 12, color: "#64748b" }
+    primaryButton: { ...shared.buttonBase, ...shared.primaryButton },
+    secondaryButton: { ...shared.buttonBase, ...shared.secondaryButton },
+    notice: { padding: 22, color: color.textFaint, fontSize: 13 },
+    hint: { fontSize: 11.5, color: color.textFaint, lineHeight: 1.6 }
   };
   var container = document.getElementById("root");
   var root = (0, import_client.createRoot)(container);

@@ -261,53 +261,202 @@ The backend is written in Go, split into three binaries (`cmd/api`, `cmd/schedul
 Deliberately not used: a separate message broker (Redis, RabbitMQ, Kafka) or an external lock service. Keeping the queue and locks inside Postgres is the whole point, since it gives transactional state transitions and one source of truth. Adding a broker later is a reasonable extension, not a starting requirement.
 
 ## Getting started
- 
+
+Everything below assumes a clean machine and a clean database, and ends with the UI
+open in a browser and real runs moving through it.
+
+### Prerequisites
+
+- **Docker** (Docker Desktop, OrbStack, or equivalent) for Postgres and the three services.
+- **Go 1.22+** only if you want to run the binaries outside Docker. The routing uses
+  the standard library's method-and-path patterns, which landed in 1.22.
+- **Node 18+** only if you intend to change the frontend. The built bundle is
+  committed, so a fresh clone renders the UI without ever running npm.
+
+### 1. Clone
+
 ```bash
-# clone and enter the project
 git clone <your-repo-url> weaver
 cd weaver
- 
-# start postgres, api, scheduler, and workers
-docker compose up --build
- 
-# run database migrations
-migrate -path ./migrations -database "$DATABASE_URL" up
- 
-# the API (and the UI it serves) is available at http://localhost:8080
 ```
- 
-To scale workers locally, increase the replica count:
- 
+
+### 2. Start everything
+
 ```bash
-docker compose up --scale worker=4
+docker compose up --build --scale worker=2
 ```
 
-## Frontend
+That brings up five things: Postgres, a one-shot `migrate` container that applies
+every migration in `migrations/` and exits, the API on port 8080, the scheduler
+(which runs the cron loop and the reaper), and two workers. The workers wait for the
+migration container to finish, so they never poll a schema that is not there yet.
 
-The UI is a React app under `web/`, bundled with esbuild (no Vite). The Go API serves the built assets, so there is one origin and no CORS: API routes live under `/api`, and every other path falls through to the file server. A browser call is just `fetch('/api/workflows')`, with no host and no port.
+Two workers rather than one because a single worker runs its tasks one at a time; with
+two you can watch independent branches of a DAG execute in parallel.
 
-The API reads the frontend from disk rather than embedding it, so a rebuilt bundle needs only a browser refresh. It looks in `./web` by default; set `WEB_DIR` to override (Compose bind-mounts `./web` and sets it to `/web`).
+Leave it running and open a second terminal for the next step.
 
-Install dependencies once:
+### 3. Register two example workflows
+
+Nothing is registered by default, so the UI starts empty. These two are enough to see
+every state the system has. Both use the demo handlers wired up in
+[`cmd/worker/main.go`](cmd/worker/main.go), which sleep for a random 200-1000ms and
+log as they go.
+
+A healthy pipeline, shaped as a diamond so two tasks run in parallel:
+
+```bash
+curl -s localhost:8080/api/workflows -H 'Content-Type: application/json' -d '{
+  "name": "etl-pipeline",
+  "tasks": [
+    {"id": "extract",   "handler": "extractData"},
+    {"id": "transform", "handler": "transformData", "dependsOn": ["extract"]},
+    {"id": "validate",  "handler": "validateData",  "dependsOn": ["extract"]},
+    {"id": "load",      "handler": "loadWarehouse", "dependsOn": ["transform", "validate"]},
+    {"id": "notify",    "handler": "sendEmail",     "dependsOn": ["load"]}
+  ]}'
+```
+
+And one that fails on purpose. `noSuchHandler` is not in the registry, so the task
+fails every attempt: the cheapest way to watch the retry and backoff machinery
+without waiting for a real flake.
+
+```bash
+curl -s localhost:8080/api/workflows -H 'Content-Type: application/json' -d '{
+  "name": "flaky-pipeline",
+  "tasks": [
+    {"id": "extract",    "handler": "extractData"},
+    {"id": "broken",     "handler": "noSuchHandler", "retries": 3, "dependsOn": ["extract"]},
+    {"id": "never-runs", "handler": "sendEmail",     "dependsOn": ["broken"]}
+  ]}'
+```
+
+Each returns the new workflow's id and version.
+
+### 4. Open the UI
+
+[http://localhost:8080](http://localhost:8080)
+
+Pick a workflow on the left, press **Trigger run**, and watch. The next section is a
+tour of what is worth looking at.
+
+### Scaling and stopping
+
+```bash
+docker compose up --scale worker=4   # more workers, same queue
+docker compose down                  # stop, keeping the database volume
+docker compose down -v               # stop and delete all data
+```
+
+## What to try
+
+The demo handlers finish in well under a second, so a run is over in a few seconds.
+Trigger things more than once.
+
+**Watch a run execute.** Pick `etl-pipeline` and press **Trigger run**. Nodes move
+grey -> blue -> amber (pulsing) -> green as the workers pick them up. `transform` and
+`validate` both depend only on `extract`, so with two workers they go amber together,
+and `load` stays grey until both are green. That is the dependency resolution doing
+its job, visible.
+
+**Open a task while it is running.** Click any node. The panel on the right shows its
+timings, its handler, and its log, and keeps up with it: log lines appear as the
+handler writes them and Duration counts up as `755ms (running)` until the task lands.
+
+**Watch a task retry and die.** Trigger `flaky-pipeline`. `broken` turns orange
+(`FAILED`, with a `2/4` attempt counter) between attempts, then red (`DEAD`) once its
+attempts are gone. Click it: the log is grouped by attempt, and each group records
+the jittered backoff that followed it, something like `retrying in 582ms (attempt 2
+of 4)`. Notice `never-runs` stays grey forever, because a downstream task of a dead
+task is never unblocked.
+
+**Read the run history.** Bottom left, newest first. The bar under each row is that
+run's tasks broken down by state, so a run that half-finished is distinguishable from
+one that failed immediately without opening either. Hover for exact counts, click to
+reopen a run and inspect it exactly as if it were live.
+
+**Cancel a run.** Trigger `etl-pipeline`, then, while it is still going:
+
+```bash
+curl -s -X POST localhost:8080/api/runs/<run-id>/cancel
+```
+
+Anything not yet started turns to dashed `CANCELLED` outlines. The UI never learns
+about this directly; it just polls, which is the point of keeping the UI a read layer.
+
+**Kill a worker mid-task.** The Phase 6 payoff, and the most interesting thing here:
+
+```bash
+docker compose kill --signal=SIGKILL worker
+```
+
+`SIGKILL` gives the worker no chance to release its lease. Its task sits in `RUNNING`
+until the lease expires (30s), the reaper notices, and the task goes back to `FAILED`
+with `worker lease expired; requeued by reaper` in its log. Bring workers back with
+`docker compose up -d --scale worker=2` and another one finishes it, on the next
+attempt number. Nothing is lost and nothing runs twice.
+
+## Frontend development
+
+Skip this unless you are changing the UI. The built bundle is committed, so the steps
+above never need npm.
+
+The UI is a React app under `web/`, bundled with esbuild (no Vite). The Go API serves
+the built assets, so there is one origin and no CORS: API routes live under `/api`,
+and every other path falls through to the file server. A browser call is just
+`fetch('/api/workflows')`, with no host and no port.
+
+The API reads the frontend from disk rather than embedding it, so a rebuilt bundle
+needs only a browser refresh. It looks in `./web` by default; set `WEB_DIR` to
+override (Compose bind-mounts `./web` and sets it to `/web`, which is why a rebuild on
+the host is live inside the container with no image rebuild).
 
 ```bash
 cd web
-npm install
+npm install     # once
+npm run dev     # rebuild on every save
+npm run build   # one-shot build
 ```
 
-For development, run the bundler in watch mode so it rebuilds on every save:
+Both commands bundle `src/main.jsx`, resolving imports and transforming JSX into
+`dist/bundle.js`, which `index.html` loads. `npm run dev` only rebuilds the bundle; it
+does not reload the browser, so refresh to see changes.
+
+Colours and spacing come from `web/src/theme.js`, and the task state palette from
+`web/src/status.js`. Those two files are the whole design system; components import
+from them rather than writing literal colours.
+
+## Running without Docker
+
+Useful when iterating on Go code, since it skips an image rebuild each time.
 
 ```bash
-npm run dev
+# Postgres still comes from Compose
+docker compose up -d postgres
+
+export DATABASE_URL='postgres://weaver:weaver_dev_password@localhost:5432/weaver?sslmode=disable'
+make migrate-up
+
+go run ./cmd/api        # :8080, also serves the UI
+go run ./cmd/worker     # run this in two terminals for two workers
+go run ./cmd/scheduler  # cron loop and reaper
 ```
 
-For a one-shot production build:
+`make migrate-up` needs the [golang-migrate](https://github.com/golang-migrate/migrate)
+CLI on your PATH (`brew install golang-migrate`). Under Docker the `migrate` service
+does this for you, so the CLI is only needed here.
+
+### If the workflow list looks cluttered
+
+The integration tests register throwaway workflows and leave them behind. To clear
+them out:
 
 ```bash
-npm run build
+docker compose exec postgres psql -U weaver -d weaver -c "
+DELETE FROM runs WHERE workflow_id IN (
+  SELECT id FROM workflows WHERE name LIKE 'claim-test-%' OR name LIKE 'demo-%');
+DELETE FROM workflows WHERE name LIKE 'claim-test-%' OR name LIKE 'demo-%';"
 ```
-
-Both commands bundle `src/main.jsx` (resolving imports and transforming JSX) into `dist/bundle.js`, which `index.html` loads. With the API running, the UI is served alongside it; `npm run dev` only rebuilds the bundle, so refresh the browser to see changes.
 
 ## Screenshots
  
@@ -371,10 +520,13 @@ curl -s localhost:8080/api/workflows
 # Trigger a run of a workflow by id (returns the new run id)
 curl -s -X POST localhost:8080/api/workflows/<workflow-id>/runs
 
-# Fetch a run and the state of every task in it
+# Run history, newest first, across every version of this workflow's name
+curl -s "localhost:8080/api/workflows/<workflow-id>/runs?limit=10"
+
+# Fetch a run, the state of every task in it, and the edges between them
 curl -s localhost:8080/api/runs/<run-id>
 
-# Fetch a single task, including its result and error
+# Fetch a single task: timings, result, error, and its log lines grouped by attempt
 curl -s localhost:8080/api/runs/<run-id>/tasks/<task-id>
 
 # Cancel an in-flight run (stops unstarted tasks; running ones finish and are ignored)

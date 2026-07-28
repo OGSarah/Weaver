@@ -1,5 +1,6 @@
 import React from "react";
 import { statusColors } from "./status.js";
+import { color, font, shared } from "./theme.js";
 
 // TaskPanel is everything known about one task: its state, its timings, why it
 // failed if it did, whatever the handler returned, and its log.
@@ -49,13 +50,19 @@ function Facts({ task }) {
 		<dl style={styles.facts}>
 			<Fact label="Status">
 				<span
-					style={{ ...styles.pill, background: c.fill, borderColor: c.stroke, color: c.text }}
+					style={{
+						...styles.pill,
+						background: c.fill,
+						borderColor: c.stroke,
+						color: c.text,
+						textTransform: "uppercase",
+					}}
 				>
 					{task.status}
 				</span>
 			</Fact>
 			<Fact label="Handler">
-				<code>{task.handler}</code>
+				<code style={styles.inlineCode}>{task.handler}</code>
 			</Fact>
 			<Fact label="Attempt">
 				{task.attempt} of {task.maxAttempts}
@@ -157,94 +164,92 @@ function duration(startedAt, finishedAt) {
 
 const styles = {
 	panel: {
-		width: 360,
-		borderLeft: "1px solid #e2e8f0",
+		width: 380,
+		flexShrink: 0,
+		borderLeft: `1px solid ${color.border}`,
 		display: "flex",
 		flexDirection: "column",
 		minHeight: 0,
-		background: "#ffffff",
+		background: color.surface,
 	},
 	header: {
 		display: "flex",
 		alignItems: "center",
 		gap: 8,
-		padding: "10px 14px",
-		borderBottom: "1px solid #e2e8f0",
+		padding: "11px 16px",
+		borderBottom: `1px solid ${color.border}`,
+		flexShrink: 0,
 	},
-	title: { flex: 1, fontSize: 14 },
+	title: { flex: 1, fontSize: 13.5, color: color.text, fontFamily: font.mono },
 	close: {
 		border: "none",
 		background: "none",
-		fontSize: 20,
+		fontSize: 18,
 		lineHeight: 1,
 		cursor: "pointer",
-		color: "#64748b",
-		padding: 0,
+		color: color.textFaint,
+		padding: "0 2px",
 	},
 	// The panel scrolls on its own; a long log must not stretch the page.
-	body: { overflowY: "auto", padding: "12px 14px", fontSize: 13 },
+	body: { overflowY: "auto", padding: "14px 16px", fontSize: 12.5 },
 	facts: {
 		display: "grid",
 		gridTemplateColumns: "auto 1fr",
-		gap: "4px 12px",
-		margin: "0 0 14px",
+		gap: "6px 14px",
+		margin: "0 0 16px",
 		alignItems: "baseline",
 	},
-	factLabel: { color: "#64748b", fontSize: 12 },
-	factValue: { margin: 0, wordBreak: "break-word" },
-	pill: {
-		fontSize: 11,
-		fontWeight: 600,
-		padding: "1px 8px",
-		borderRadius: 999,
-		borderWidth: 1,
-		borderStyle: "solid",
-	},
-	sectionTitle: {
-		fontSize: 11,
-		textTransform: "uppercase",
-		letterSpacing: "0.06em",
-		color: "#64748b",
-		margin: "0 0 6px",
-	},
+	factLabel: { color: color.textFaint, fontSize: 11 },
+	factValue: { margin: 0, wordBreak: "break-word", color: color.text },
+	pill: shared.pill,
+	sectionTitle: shared.sectionTitle,
+	inlineCode: { fontFamily: font.mono, fontSize: 11.5, color: color.textMuted },
 	error: {
-		margin: "0 0 14px",
-		padding: 8,
-		background: "#fef2f2",
-		color: "#b91c1c",
-		borderRadius: 4,
-		fontSize: 12,
+		margin: "0 0 16px",
+		padding: "8px 10px",
+		background: color.dangerSoft,
+		color: color.danger,
+		border: `1px solid ${color.dangerBorder}`,
+		borderRadius: 5,
+		fontSize: 11.5,
+		fontFamily: font.mono,
 		whiteSpace: "pre-wrap",
 		wordBreak: "break-word",
 	},
 	code: {
-		margin: "0 0 14px",
-		padding: 8,
-		background: "#f8fafc",
-		borderRadius: 4,
-		fontSize: 12,
+		margin: "0 0 16px",
+		padding: "8px 10px",
+		background: color.bg,
+		border: `1px solid ${color.border}`,
+		borderRadius: 5,
+		fontSize: 11.5,
+		fontFamily: font.mono,
+		color: color.textMuted,
 		overflowX: "auto",
 	},
-	attemptGroup: { marginBottom: 10 },
+	attemptGroup: { marginBottom: 12 },
 	attemptLabel: {
-		fontSize: 11,
+		fontSize: 10,
 		fontWeight: 600,
-		color: "#475569",
-		borderTop: "1px solid #e2e8f0",
-		paddingTop: 4,
-		marginBottom: 2,
+		textTransform: "uppercase",
+		letterSpacing: "0.08em",
+		color: color.textFaint,
+		borderTop: `1px solid ${color.border}`,
+		paddingTop: 6,
+		marginBottom: 4,
 	},
 	log: { listStyle: "none", margin: 0, padding: 0 },
 	logLine: {
 		display: "flex",
-		gap: 8,
-		fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+		gap: 10,
+		fontFamily: font.mono,
 		fontSize: 11,
-		lineHeight: 1.6,
+		lineHeight: 1.65,
 		wordBreak: "break-word",
+		color: color.textMuted,
 	},
-	logTime: { color: "#94a3b8", flexShrink: 0 },
-	logError: { color: "#b91c1c" },
-	truncated: { fontSize: 11, color: "#b45309", margin: "0 0 6px" },
-	muted: { color: "#64748b", padding: "0 0 8px" },
+	logTime: { color: color.textFaint, flexShrink: 0, opacity: 0.75 },
+	logError: { color: color.danger },
+	truncated: { fontSize: 11, color: color.warn, margin: "0 0 8px" },
+	muted: { color: color.textFaint, padding: "0 0 8px" },
 };

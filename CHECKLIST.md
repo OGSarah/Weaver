@@ -152,7 +152,7 @@ Then build the views:
 - [x] Render a workflow as a DAG using a graph library, so dependencies are visible.
 - [x] Show a run's live status: color each task node by state (Pending, Ready, Running, Succeeded, Failed, Dead) and poll for updates.
 - [x] Add a run history view and a per-task log/detail panel. Includes capturing task logs to Postgres, since there was nowhere for logs to come from before.
-- [ ] Write a README section documenting how to run the whole thing locally, including the frontend build step.
+- [x] Write a README section documenting how to run the whole thing locally, including the frontend build step.
 Stretch goals:
  
 - [ ] A metrics endpoint exposing queue depth, run latency, and worker liveness.
@@ -168,8 +168,8 @@ the backend, not the frontend.
 ## Definition of done
  
 - [x] A workflow can be defined, validated, scheduled, and triggered.
-- [ ] Multiple workers execute tasks concurrently with no double execution.
-- [ ] Failed tasks retry with backoff and eventually land in Dead.
-- [ ] Killing a worker mid-task does not lose the work: it resumes.
-- [ ] The UI shows the DAG and live run status.
-- [ ] You can explain, out loud, every "you should understand" line above.
+- [x] Multiple workers execute tasks concurrently with no double execution.
+- [x] Failed tasks retry with backoff and eventually land in Dead.
+- [x] Killing a worker mid-task does not lose the work: it resumes.
+- [x] The UI shows the DAG and live run status.
+- [x] You can explain, out loud, every "you should understand" line above.
