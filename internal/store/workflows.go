@@ -110,7 +110,7 @@ func (s *Store) GetWorkflow(ctx context.Context, id string) (*WorkflowRecord, er
 		id,
 	).Scan(&w.ID, &w.Name, &schedule, &w.Version, &w.CreatedAt, &raw)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) || isMalformedID(err) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("query workflow: %w", err)

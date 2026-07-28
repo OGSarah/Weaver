@@ -73,6 +73,56 @@ test("edgePath draws a straight line when there is nothing to smooth", () => {
 	);
 });
 
+// The API rejects these shapes, so reaching the renderer with one means something
+// upstream is already wrong. The graph still has to draw: a thrown exception here
+// takes the whole page down, which is a worse way to learn about it than a strange
+// looking DAG.
+test("layoutDag survives graphs the API would never send", () => {
+	const cases = {
+		"duplicate ids": [{ id: "a" }, { id: "a" }],
+		"self dependency": [{ id: "a", dependsOn: ["a"] }],
+		cycle: [
+			{ id: "a", dependsOn: ["b"] },
+			{ id: "b", dependsOn: ["a"] },
+		],
+		"null dependsOn": [{ id: "a", dependsOn: null }],
+	};
+
+	for (const [label, tasks] of Object.entries(cases)) {
+		const { nodes, edges, width, height } = layoutDag(tasks);
+
+		assert.ok(nodes.length >= 1, `${label}: no nodes came back`);
+		assert.ok(width > 0 && height > 0, `${label}: empty bounding box`);
+		for (const node of nodes) {
+			assert.ok(Number.isFinite(node.x) && Number.isFinite(node.y), `${label}: ${node.id} has no position`);
+		}
+		for (const edge of edges) {
+			assert.ok(Array.isArray(edge.points), `${label}: edge without waypoints`);
+		}
+	}
+
+	// Two tasks with one id are one node: dagre keys on the id, and the second
+	// definition wins rather than producing a phantom second box.
+	assert.equal(layoutDag([{ id: "a" }, { id: "a" }]).nodes.length, 1);
+});
+
+test("edgePath keeps both endpoints", () => {
+	// A single waypoint is a degenerate edge, and the path still has to start
+	// somewhere rather than be empty or NaN.
+	assert.equal(edgePath([{ x: 1, y: 2 }]), "M 1 2");
+
+	const points = [
+		{ x: 0, y: 0 },
+		{ x: 5, y: 5 },
+		{ x: 10, y: 10 },
+		{ x: 20, y: 0 },
+	];
+	const d = edgePath(points);
+	assert.ok(d.startsWith("M 0 0"), d);
+	assert.ok(d.endsWith("20 0"), `path does not reach its final waypoint: ${d}`);
+	assert.ok(!d.includes("NaN"), `path contains NaN: ${d}`);
+});
+
 test("edgePath curves through interior waypoints", () => {
 	const d = edgePath([
 		{ x: 0, y: 0 },

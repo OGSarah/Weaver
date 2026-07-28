@@ -580,6 +580,68 @@ Workflows that carry a `schedule` are picked up by the scheduler, which creates 
 
 </details>
 
+<details>
+<summary><h2>Testing</h2></summary>
+
+```bash
+make test-db     # create weaver_test and apply the migrations (once, and after adding one)
+make test        # everything, including the tests that need Postgres
+make test-unit   # only the tests that need nothing; the rest skip themselves
+make lint        # gofmt, go vet, eslint
+cd web && npm test
+```
+
+The tests that touch a database point at `weaver_test`, not the `weaver` database
+Compose uses. They share a queue with whatever else is running against the same
+database, and the workers in Compose would claim the tasks a test just created.
+
+### What each suite covers
+
+| Suite | Tests | Coverage | Needs Postgres | What it holds down |
+| --- | --- | --- | --- | --- |
+| [internal/workflow](internal/workflow/) | 12 | 100% | no | Validation and the cycle check: every way a definition can be malformed, a 50k-deep chain, a 5k-wide fan-out, and a topological order that does not drift between runs |
+| [internal/store](internal/store/) | 25 | 66% | yes | The transactions. No double claim under contention, lease ownership, retry backoff and its jitter, cancellation, the reaper's verdicts, log and history caps, and a cancel racing a claim |
+| [internal/worker](internal/worker/) | 13 | 87% | yes | What a handler can do to a worker: panic, hang past its timeout, name a handler that does not exist, or finish work whose lease was reclaimed. Plus the poll loop and its shutdown |
+| [internal/api](internal/api/) | 10 | 81% | partly | The request surface: malformed JSON, unknown fields, bad cron, bad ids, wrong verbs, limit parsing, and a full register → trigger → poll → cancel round trip |
+| [internal/scheduler](internal/scheduler/) | 9 | 84% | yes | Cron slots becoming runs: backfilling every missed slot, never twice, never early, and a broken schedule not stalling the others |
+| [web/src](web/src/) | 19 | — | no | The pure frontend modules: DAG geometry, edge routing, and the status palette, including graphs the API would reject |
+
+Coverage is statement coverage from `make test`. The API row is "partly" because
+the validation and routing tests run with no database at all -- the server is built
+with a nil store, so a change that let one of those requests reach Postgres fails
+immediately rather than quietly growing a dependency.
+
+### Two things worth knowing
+
+**Database-backed packages take turns.** `go test ./...` runs packages
+concurrently, and the claim query is global by design: a worker takes the next
+eligible task anywhere in the queue, not one scoped to a run. Two packages testing
+at once therefore claim each other's tasks. Each such package's `TestMain` takes a
+Postgres advisory lock ([internal/testsupport](internal/testsupport/)), so they
+queue up however the suite is invoked, rather than relying on a `-p 1` nobody
+remembers to pass.
+
+**Integration tests are the point here, not a supplement.** Almost everything this
+project claims is a property of a transaction -- a claim that cannot double-issue,
+a completion that unblocks downstream work atomically, a reaper deciding a task's
+fate. Those are only true against a real Postgres, so CI runs one as a service
+container and applies the migrations before the suite, rather than skipping every
+test that matters.
+
+### Linting
+
+| Check | Command | Runs in |
+| --- | --- | --- |
+| `gofmt` | `gofmt -l .` | [Go lint](.github/workflows/go-lint.yml) |
+| `go vet` | `go vet ./...` | [Go lint](.github/workflows/go-lint.yml) |
+| ESLint (flat config, `react-hooks`) | `cd web && npm run lint` | [Web lint](.github/workflows/web-lint.yml) |
+
+CI runs the four workflows behind the badges at the top: Go tests (with a Postgres
+service), Go lint, web tests, and web lint. Every one of them is a command above,
+so a green badge means the same thing locally and on a branch.
+
+</details>
+
 ## License
 
 Released under the [MIT License](LICENSE). © 2026 SarahUniverse

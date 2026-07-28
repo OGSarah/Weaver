@@ -36,6 +36,7 @@ type expiredLease struct {
 	runID       string
 	attempt     int
 	maxAttempts int
+	runStatus   string
 }
 
 // ReapExpiredLeases recovers tasks stranded by dead workers. It finds every
@@ -47,7 +48,8 @@ type expiredLease struct {
 // kills whatever worker claims it) from being reclaimed forever: each claim has
 // already incremented the attempt count, so once it reaches max_attempts the
 // reaper lets the task die instead of requeuing it. Returns the counts requeued
-// and killed.
+// and closed out, the latter covering both a task with no attempts left and one
+// whose run has already finished or been cancelled.
 //
 // Everything runs in one transaction. FOR UPDATE OF l SKIP LOCKED locks only the
 // lease rows and steps over any a worker is actively completing, so the reaper
@@ -61,9 +63,10 @@ func (s *Store) ReapExpiredLeases(ctx context.Context) (requeued, killed int, er
 	defer tx.Rollback(ctx)
 
 	rows, err := tx.Query(ctx,
-		`SELECT l.task_id, t.run_id, t.attempt, t.max_attempts
+		`SELECT l.task_id, t.run_id, t.attempt, t.max_attempts, r.status
 		   FROM leases l
 		   JOIN tasks t ON t.id = l.task_id
+		   JOIN runs  r ON r.id = t.run_id
 		  WHERE l.expires_at < now()
 		    AND t.status = 'running'
 		  FOR UPDATE OF l SKIP LOCKED`,
@@ -77,7 +80,7 @@ func (s *Store) ReapExpiredLeases(ctx context.Context) (requeued, killed int, er
 	var expired []expiredLease
 	for rows.Next() {
 		var e expiredLease
-		if err := rows.Scan(&e.taskID, &e.runID, &e.attempt, &e.maxAttempts); err != nil {
+		if err := rows.Scan(&e.taskID, &e.runID, &e.attempt, &e.maxAttempts, &e.runStatus); err != nil {
 			rows.Close()
 			return 0, 0, fmt.Errorf("scan expired lease: %w", err)
 		}
@@ -89,6 +92,21 @@ func (s *Store) ReapExpiredLeases(ctx context.Context) (requeued, killed int, er
 	}
 
 	for _, e := range expired {
+		// A run that is no longer pending or running does not want this work back.
+		// The case that matters is cancellation: cancelling stops every task that
+		// is not executing, but a running one is left to finish because a handler
+		// cannot be stopped. If its worker then dies, requeuing the task would make
+		// it claimable again and a cancelled run would carry on executing -- the
+		// exact outcome the cancel was for. So the task ends where the rest of its
+		// run already is.
+		if e.runStatus != "pending" && e.runStatus != "running" {
+			if err := reapCancel(ctx, tx, e); err != nil {
+				return 0, 0, err
+			}
+			killed++
+			continue
+		}
+
 		// e.attempt is the attempt that was running when the worker died. If it
 		// is below the ceiling another attempt is allowed, so hand the task back;
 		// otherwise the retries are spent and the task dies here.
@@ -152,6 +170,31 @@ func reapRequeue(ctx context.Context, tx pgx.Tx, e expiredLease) error {
 		return err
 	}
 	return nil
+}
+
+// reapCancel closes out a stranded task whose run has already reached a terminal
+// state. Its attempt was abandoned and nothing further will run for this run, so
+// the task lands cancelled rather than Failed (which is claimable) or Dead (which
+// would report a deliberate stop as a failure). The run's own status is left
+// exactly as it is: it already said how the run ended.
+func reapCancel(ctx context.Context, tx pgx.Tx, e expiredLease) error {
+	_, err := tx.Exec(ctx,
+		`UPDATE tasks
+		    SET status = 'cancelled',
+		        finished_at = now(),
+		        error = 'worker lease expired; run is no longer active'
+		  WHERE id = $1 AND status = 'running'`,
+		e.taskID,
+	)
+	if err != nil {
+		return fmt.Errorf("cancel reaped task %s: %w", e.taskID, err)
+	}
+	if err := appendTaskLogTx(ctx, tx, e.taskID, e.attempt, LogError,
+		fmt.Sprintf("attempt %d abandoned: worker lease expired and the run is no longer active", e.attempt),
+	); err != nil {
+		return err
+	}
+	return deleteLease(ctx, tx, e.taskID)
 }
 
 // reapKill marks a stranded task Dead once its attempts are spent, fails its run,

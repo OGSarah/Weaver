@@ -31,10 +31,25 @@ func ValidateDef(def WorkflowDef) error {
 		if strings.TrimSpace(t.Handler) == "" {
 			return fmt.Errorf("task %q is missing its handler", t.ID)
 		}
+		// Both numbers are turned into run state the moment a run is materialized:
+		// Retries becomes max_attempts (retries + 1) and TimeoutSeconds becomes the
+		// handler's context deadline. Negative values produce a task that cannot
+		// succeed however it behaves -- max_attempts <= 0 leaves no attempt the claim
+		// can satisfy, and a negative deadline is already in the past -- so they are
+		// rejected here rather than materialized into a run that is doomed on paper.
+		if t.Retries < 0 {
+			return fmt.Errorf("task %q: retries cannot be negative (got %d)", t.ID, t.Retries)
+		}
+		if t.TimeoutSeconds < 0 {
+			return fmt.Errorf("task %q: timeoutSeconds cannot be negative (got %d)", t.ID, t.TimeoutSeconds)
+		}
 	}
 
 	// Edges must point at real tasks before the cycle check can mean anything.
 	for _, t := range def.Tasks {
+		// Per task, so the same upstream named twice is caught while an unrelated
+		// task naming it once is not.
+		upstreams := make(map[string]struct{}, len(t.DependsOn))
 		for _, up := range t.DependsOn {
 			if _, ok := seen[up]; !ok {
 				return fmt.Errorf("task %q depends on unknown task %q", t.ID, up)
@@ -42,6 +57,15 @@ func ValidateDef(def WorkflowDef) error {
 			if up == t.ID {
 				return fmt.Errorf("task %q depends on itself", t.ID)
 			}
+			// An edge is identified by its endpoints in the dependencies table
+			// (PRIMARY KEY (upstream_task_id, downstream_task_id)), so listing the
+			// same upstream twice would pass validation and then fail the insert when
+			// the run is materialized. Rejecting it here keeps "validated" meaning
+			// "runnable".
+			if _, dup := upstreams[up]; dup {
+				return fmt.Errorf("task %q depends on %q more than once", t.ID, up)
+			}
+			upstreams[up] = struct{}{}
 		}
 	}
 

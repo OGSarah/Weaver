@@ -104,6 +104,12 @@ func (s *Store) ListRunHistory(ctx context.Context, workflowID string, limit int
 		workflowID, limit,
 	)
 	if err != nil {
+		// History is a page, not a lookup, so an unparseable id answers the way an
+		// unknown one does -- with nothing -- rather than with an error the caller
+		// would have to handle separately for the same situation.
+		if isMalformedID(err) {
+			return []RunHistoryEntry{}, nil
+		}
 		return nil, fmt.Errorf("query run history: %w", err)
 	}
 	defer rows.Close()
@@ -122,6 +128,11 @@ func (s *Store) ListRunHistory(ctx context.Context, workflowID string, limit int
 		out = append(out, e)
 	}
 	if err := rows.Err(); err != nil {
+		// pgx reports a rejected parameter when the rows are read rather than when
+		// the query is sent, so the malformed-id case can surface at either point.
+		if isMalformedID(err) {
+			return []RunHistoryEntry{}, nil
+		}
 		return nil, fmt.Errorf("iterate run history: %w", err)
 	}
 	return out, nil
@@ -139,7 +150,7 @@ func (s *Store) GetRunState(ctx context.Context, runID string) (*RunState, error
 		runID,
 	).Scan(&r.ID, &r.WorkflowID, &r.Status, &r.CreatedAt, &r.StartedAt, &r.FinishedAt)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) || isMalformedID(err) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("query run: %w", err)

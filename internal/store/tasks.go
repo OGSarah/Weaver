@@ -39,7 +39,7 @@ func (s *Store) GetTask(ctx context.Context, runID, taskID string) (*TaskDetail,
 		&result, &d.Error,
 	)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) || isMalformedID(err) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("query task: %w", err)
@@ -65,18 +65,22 @@ func (s *Store) CancelRun(ctx context.Context, runID string) error {
 	}
 	defer tx.Rollback(ctx)
 
-	// Lock the run row and check it is still cancellable in one step, so two
-	// concurrent cancels (or a cancel racing a completion) resolve to one outcome.
+	// Does the run exist at all? An unlocked read, because taking the run's row
+	// lock here is what used to make this deadlock: ClaimTask locks a task row and
+	// then updates the run, so a cancel that locked the run first and reached for
+	// the tasks afterwards closed the cycle, and Postgres aborted one of the two
+	// with a deadlock error -- a spurious 500 on a cancel, or a failed claim in a
+	// worker. Every writer now takes tasks before runs.
+	//
+	// Nothing is decided from this read: a run that finishes between here and the
+	// update below is caught by the update's own WHERE clause.
 	var status string
-	err = tx.QueryRow(ctx,
-		`SELECT status FROM runs WHERE id = $1 FOR UPDATE`,
-		runID,
-	).Scan(&status)
+	err = tx.QueryRow(ctx, `SELECT status FROM runs WHERE id = $1`, runID).Scan(&status)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) || isMalformedID(err) {
 			return ErrNotFound
 		}
-		return fmt.Errorf("lock run: %w", err)
+		return fmt.Errorf("read run: %w", err)
 	}
 	if status != "pending" && status != "running" {
 		return ErrNotCancellable
@@ -110,12 +114,25 @@ func (s *Store) CancelRun(ctx context.Context, runID string) error {
 		return fmt.Errorf("cancel tasks: %w", err)
 	}
 
-	_, err = tx.Exec(ctx,
-		`UPDATE runs SET status = 'cancelled', finished_at = now() WHERE id = $1`,
+	// The run row is taken last, and the state check lives in the WHERE clause
+	// rather than in the read above. That is what makes the decision atomic now
+	// that the read holds no lock: two concurrent cancels, or a cancel racing a
+	// completion, both reach here, and exactly one matches a row. The loser sees
+	// zero rows affected and reports the run as no longer cancellable rather than
+	// overwriting a finished run's status and timestamp.
+	tag, err := tx.Exec(ctx,
+		`UPDATE runs
+		    SET status = 'cancelled', finished_at = now()
+		  WHERE id = $1 AND status IN ('pending', 'running')`,
 		runID,
 	)
 	if err != nil {
 		return fmt.Errorf("cancel run: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		// Rolls back the task cancellations above: the run reached a terminal state
+		// under us, so nothing about this cancel applies.
+		return ErrNotCancellable
 	}
 
 	if err := tx.Commit(ctx); err != nil {

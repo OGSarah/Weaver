@@ -178,13 +178,7 @@ func TestHeartbeatExtendsLease(t *testing.T) {
 	})
 
 	// Claim with a lease already on the edge of expiry.
-	ct, err := s.ClaimTask(ctx, "alive", 1*time.Second)
-	if err != nil {
-		t.Fatalf("claim: %v", err)
-	}
-	if ct == nil || ct.RunID != runID {
-		t.Fatalf("wanted this run's task, got %v", ct)
-	}
+	ct := claimOneWithTTL(t, s, "alive", runID, 1*time.Second)
 
 	// A heartbeat renews it well into the future.
 	held, err := s.Heartbeat(ctx, ct.ID, "alive", 30*time.Second)

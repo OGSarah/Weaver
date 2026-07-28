@@ -48,21 +48,87 @@ func seedRun(t *testing.T, s *Store, def workflow.WorkflowDef) string {
 	return runID
 }
 
-// claimOne claims the next task and asserts it belongs to runID. A clean test
-// database has only this run's work ready, so a foreign task is a real problem.
+// claimOne claims until it gets a task belonging to runID.
+//
+// The claim query is global by design -- a worker takes the next eligible task in
+// the whole queue, not one scoped to a run -- so a test cannot assume the only
+// claimable work is its own. Runs left behind by earlier tests, or by anything
+// else pointed at the same database, are real work as far as the queue is
+// concerned; they are simply not what this test is asserting about. Skipping past
+// them is what keeps a failure here meaning "the claim path is wrong" rather than
+// "something else was in the queue".
 func claimOne(t *testing.T, s *Store, workerID, runID string) *ClaimedTask {
 	t.Helper()
-	ct, err := s.ClaimTask(context.Background(), workerID, 30*time.Second)
-	if err != nil {
-		t.Fatalf("claim: %v", err)
+	return claimOneWithTTL(t, s, workerID, runID, 30*time.Second)
+}
+
+// claimOneWithTTL is claimOne for a test that cares about the lease duration.
+func claimOneWithTTL(t *testing.T, s *Store, workerID, runID string, ttl time.Duration) *ClaimedTask {
+	t.Helper()
+
+	// Within a sweep, foreign tasks are held rather than released: a claimed task is
+	// Running and so no longer claimable, which is what makes the queue drain.
+	// Releasing them as we went would put them straight back and the loop could
+	// circle the same tasks forever.
+	//
+	// Between sweeps everything borrowed goes back, and the search waits a moment
+	// before trying again. This run's task can be missing for a while rather than
+	// forever: go test runs packages concurrently against one database, so another
+	// package's test may be holding it, and it will let go.
+	deadline := time.Now().Add(20 * time.Second)
+	for attempt := 0; ; attempt++ {
+		ct, borrowed := sweepForTask(t, s, workerID, runID, ttl)
+		for _, other := range borrowed {
+			releaseClaim(t, s, other)
+		}
+		if ct != nil {
+			return ct
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("no claimable task in run %s after %d sweeps", runID, attempt+1)
+		}
+		time.Sleep(100 * time.Millisecond)
 	}
-	if ct == nil {
-		t.Fatalf("wanted a claimable task, got none")
+}
+
+// sweepForTask claims until it finds runID's task or the queue is empty, returning
+// that task (or nil) plus every foreign task it had to hold along the way.
+func sweepForTask(t *testing.T, s *Store, workerID, runID string, ttl time.Duration) (*ClaimedTask, []*ClaimedTask) {
+	t.Helper()
+	ctx := context.Background()
+
+	var borrowed []*ClaimedTask
+	for {
+		ct, err := s.ClaimTask(ctx, workerID, ttl)
+		if err != nil {
+			t.Fatalf("claim: %v", err)
+		}
+		if ct == nil {
+			return nil, borrowed
+		}
+		if ct.RunID == runID {
+			return ct, borrowed
+		}
+		borrowed = append(borrowed, ct)
 	}
-	if ct.RunID != runID {
-		t.Fatalf("claimed task from run %s, want %s (dirty test database?)", ct.RunID, runID)
+}
+
+// releaseClaim undoes a claim, putting the task back as though it had never been
+// taken. Two single-row writes scoped to the task rather than FailTask, which also
+// locks the run row -- enough to deadlock against a test in another package
+// working on the same run, since go test runs packages concurrently against one
+// database.
+func releaseClaim(t *testing.T, s *Store, ct *ClaimedTask) {
+	t.Helper()
+	ctx := context.Background()
+	if _, err := s.pool.Exec(ctx,
+		`UPDATE tasks SET status = 'ready', attempt = attempt - 1, started_at = NULL
+		  WHERE id = $1 AND status = 'running'`, ct.ID); err != nil {
+		t.Logf("release foreign task %s: %v", ct.ID, err)
 	}
-	return ct
+	if _, err := s.pool.Exec(ctx, `DELETE FROM leases WHERE task_id = $1`, ct.ID); err != nil {
+		t.Logf("release foreign lease %s: %v", ct.ID, err)
+	}
 }
 
 func statusByName(t *testing.T, s *Store, runID string) map[string]TaskState {
@@ -428,8 +494,36 @@ func TestBackoffDelay(t *testing.T) {
 			}
 		}
 	}
-	// Large attempts must stay capped, never overflow to a negative duration.
-	if d := backoffDelay(1000); d <= 0 || d > maxBackoff {
-		t.Errorf("capped delay out of range: %s", d)
+	// Large attempts must stay capped, never overflow to a negative duration. The
+	// shift is what would overflow, so these bracket the clamp: one just inside it,
+	// one far past it, and one past the point where the untruncated shift would
+	// have wrapped int64 around into a negative delay.
+	for _, attempt := range []int{30, 31, 63, 64, 65, 1000, 1 << 30} {
+		d := backoffDelay(attempt)
+		if d <= 0 || d > maxBackoff {
+			t.Errorf("attempt %d: delay %s outside (0, %s]", attempt, d, maxBackoff)
+		}
+	}
+
+	// A caller that has not attempted anything yet, or that passes a nonsense
+	// attempt, still has to get a usable delay rather than a zero (retry now, in a
+	// tight loop) or a negative one (a scheduled_at in the past, same thing).
+	for _, attempt := range []int{0, -1, -1000} {
+		d := backoffDelay(attempt)
+		if d < baseBackoff/2 || d > baseBackoff {
+			t.Errorf("attempt %d: delay %s outside the first-retry window [%s, %s]",
+				attempt, d, baseBackoff/2, baseBackoff)
+		}
+	}
+
+	// Full jitter exists to spread a batch of tasks that failed together. If it
+	// ever collapsed to a constant, a stampede would retry in lockstep, which the
+	// range check above cannot catch on its own.
+	seen := make(map[time.Duration]bool)
+	for i := 0; i < 200; i++ {
+		seen[backoffDelay(5)] = true
+	}
+	if len(seen) < 50 {
+		t.Errorf("200 delays produced only %d distinct values; jitter is not spreading retries", len(seen))
 	}
 }
