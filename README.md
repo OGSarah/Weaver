@@ -234,8 +234,9 @@ Each task has a max attempt count and a base backoff. On failure, Weaver compute
  
 </details>
 
-## Data model
- 
+<details>
+<summary><h2>Data model</h2></summary>
+
 The core tables (simplified):
  
 - `workflows`: The DAG definition, versioned, stored as task nodes and edges.
@@ -246,8 +247,11 @@ The core tables (simplified):
 
 Keeping the queue inside Postgres (rather than a separate broker) means one source of truth, transactional state transitions, and easy recovery. It trades some raw throughput for a much simpler correctness story, which is the right call for a system whose whole point is reliability.
  
-## Tech stack
- 
+</details>
+
+<details>
+<summary><h2>Tech stack</h2></summary>
+
 The backend is written in Go, split into three binaries (`cmd/api`, `cmd/scheduler`, `cmd/worker`) that share one database. Go is a natural fit here: goroutines make the worker pool and heartbeat loops cheap and easy to reason about, and each binary compiles to a single static file that is trivial to run and deploy.
  
 - Language: Go (1.22 or newer).
@@ -260,6 +264,8 @@ The backend is written in Go, split into three binaries (`cmd/api`, `cmd/schedul
 - Local dev: Docker Compose to bring up Postgres and one or more workers.
 
 Deliberately not used: a separate message broker (Redis, RabbitMQ, Kafka) or an external lock service. Keeping the queue and locks inside Postgres is the whole point, since it gives transactional state transitions and one source of truth. Adding a broker later is a reasonable extension, not a starting requirement.
+
+</details>
 
 <details>
 <summary><h2>Getting started</h2></summary>
@@ -351,9 +357,7 @@ docker compose down                  # stop, keeping the database volume
 docker compose down -v               # stop and delete all data
 ```
 
-</details>
-
-## What to try
+### What to try
 
 The demo handlers finish in well under a second, so a run is over in a few seconds.
 Trigger things more than once.
@@ -400,6 +404,8 @@ until the lease expires (30s), the reaper notices, and the task goes back to `FA
 with `worker lease expired; requeued by reaper` in its log. Bring workers back with
 `docker compose up -d --scale worker=2` and another one finishes it, on the next
 attempt number. Nothing is lost and nothing runs twice.
+
+</details>
 
 <details>
 <summary><h2>Frontend development</h2></summary>
@@ -450,7 +456,8 @@ from them rather than writing literal colours.
 
 </details>
 
-## Running without Docker
+<details>
+<summary><h2>Running without Docker</h2></summary>
 
 Useful when iterating on Go code, since it skips an image rebuild each time, and the
 only sensible way to work on the frontend.
@@ -490,8 +497,11 @@ DELETE FROM runs WHERE workflow_id IN (
 DELETE FROM workflows WHERE name LIKE 'claim-test-%' OR name LIKE 'demo-%';"
 ```
 
-## API sketch
- 
+</details>
+
+<details>
+<summary><h2>API sketch</h2></summary>
+
 Every API route lives under `/api`. Everything outside that prefix is the UI, served
 as static files by the same binary on the same origin.
 
@@ -513,7 +523,9 @@ POST   /api/runs/:id/cancel        cancel an in-flight run
 GET    /healthz                    liveness probe (not under /api: it is an
                                    infrastructure concern, not part of the UI's API)
 ```
- 
+
+</details>
+
 ## Example workflow definition
  
 ```json
@@ -529,7 +541,8 @@ GET    /healthz                    liveness probe (not under /api: it is an
 }
 ```
 
-## Trying the API
+<details>
+<summary><h2>Trying the API</h2></summary>
 
 With the stack up (`docker compose up --build`), the API is on `http://localhost:8080`. A definition is validated on registration: a cyclic DAG, an edge to an unknown task, or an unparseable schedule is rejected with a `400` before anything is stored. Registering a name that already exists stores a new version rather than overwriting it.
 
@@ -557,6 +570,8 @@ curl -s -X POST localhost:8080/api/runs/<run-id>/cancel
 ```
 
 Workflows that carry a `schedule` are picked up by the scheduler, which creates a run each time a cron slot comes due. If the scheduler was down across several slots, it backfills a run for each missed slot when it returns rather than skipping them. The run for a given slot is created exactly once even if several schedulers are running: the insert is guarded by a unique index on `(workflow_id, scheduled_for)`, so the losers of the race become no-ops rather than duplicate runs.
+
+</details>
 
 ## License
 
