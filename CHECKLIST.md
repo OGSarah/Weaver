@@ -1,5 +1,13 @@
 # Weaver build checklist
 
+A step-by-step plan for building Weaver, ordered so that every phase ends with something that actually runs. Do not skip ahead: each phase depends on the one before it, the same way the tasks in your DAGs do.
+ 
+Check items off as you go. If you only have a week, Phases 0 through 5 are the core; Phases 6 and 7 are the parts that make it feel real; Phase 8 is polish and stretch goals.
+ 
+A note for learning: at the end of each phase there is a "you should understand" line. If you cannot explain that idea in your own words, revisit it before moving on. That is where the senior-level learning actually lives.
+ 
+---
+
 ## Phase 0: Environment and project setup
 
 - [x] Install Go (`brew install go`) and confirm with `go version`.
@@ -120,24 +128,45 @@ You should understand: why "create exactly one run when a schedule is due" is a 
 ---
 
 ## Phase 8: The UI and polish
-
+ 
 Make it visible and pleasant, then reach for the stretch goals.
-
-- [ ] Scaffold a React app (Vite is the quickest) that talks to your API.
+ 
+Frontend approach: React with a hand-rolled esbuild bundler (no Vite). The
+extra setup is deliberate, so you understand what a bundler actually does
+before a tool hides it. esbuild is chosen over webpack for speed and a far
+smaller config.
+ 
+Scaffold the React app with your own build:
+ 
+- [ ] Create a `web/` folder at the project root, a sibling to `cmd/` and `internal/`.
+- [ ] `npm init` inside `web/`, then install React: `npm install react react-dom`.
+- [ ] Install the bundler as a dev dependency: `npm install --save-dev esbuild`.
+- [ ] Add a static `web/index.html` with a single `<div id="root">` and a `<script src="/dist/bundle.js">`.
+- [ ] Create the entry file `web/src/main.jsx` that mounts a placeholder React component into `#root`.
+- [ ] Add build scripts to `package.json`: a one-shot `build` and a `--watch` dev script that rebuilds on change. Point esbuild at `src/main.jsx`, enable JSX, and output to `dist/bundle.js`.
+- [ ] Run the watch script and confirm the placeholder component renders in a browser. This proves the bundler, JSX transform, and React mount all work before any Weaver-specific code.
+- [ ] Decide how the browser reaches the API. Simplest for this setup: have the Go API serve `web/` as static files, so the UI and API share one origin and there is no CORS or proxy. (Alternative: run esbuild's dev server and proxy `/api` to `:8080`.)
+- [ ] Smoke test the connection: one `fetch` to an existing endpoint (list workflows or get a run), logged to the console. JSON coming back proves the whole chain (static serving, API, database) end to end.
+Then build the views:
+ 
 - [ ] Render a workflow as a DAG using a graph library, so dependencies are visible.
 - [ ] Show a run's live status: color each task node by state (Pending, Ready, Running, Succeeded, Failed, Dead) and poll for updates.
 - [ ] Add a run history view and a per-task log/detail panel.
-- [ ] Write a README section documenting how to run the whole thing locally.
-- [ ] Stretch: a metrics endpoint exposing queue depth, run latency, and worker liveness.
-- [ ] Stretch: per-workflow concurrency limits or task priorities.
-- [ ] Stretch: dynamic fan-out, where one task generates several downstream tasks at runtime.
-
-You should understand: how the UI stays a thin read layer over the database, and why the interesting reliability guarantees all live in the backend, not the frontend.
-
+- [ ] Write a README section documenting how to run the whole thing locally, including the frontend build step.
+Stretch goals:
+ 
+- [ ] A metrics endpoint exposing queue depth, run latency, and worker liveness.
+- [ ] Per-workflow concurrency limits or task priorities.
+- [ ] Dynamic fan-out, where one task generates several downstream tasks at runtime.
+You should understand: what a bundler actually does (resolve imports, transform
+JSX, emit one file the browser can load), how the UI stays a thin read layer
+over the database, and why the interesting reliability guarantees all live in
+the backend, not the frontend.
+ 
 ---
-
+ 
 ## Definition of done
-
+ 
 - [x] A workflow can be defined, validated, scheduled, and triggered.
 - [ ] Multiple workers execute tasks concurrently with no double execution.
 - [ ] Failed tasks retry with backoff and eventually land in Dead.
