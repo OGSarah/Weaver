@@ -457,9 +457,9 @@ has one source in the repo, the same file the README shows, rather than a second
 living under `web/`. Emitting assets like this is the other half of what a bundler
 does, beyond resolving and transforming JavaScript.
 
-Colours and spacing come from `web/src/theme.js`, and the task state palette from
+Colors and spacing come from `web/src/theme.js`, and the task state palette from
 `web/src/status.js`. Those two files are the whole design system; components import
-from them rather than writing literal colours.
+from them rather than writing literal colors.
 
 </details>
 
