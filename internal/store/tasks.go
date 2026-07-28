@@ -50,9 +50,10 @@ func (s *Store) GetTask(ctx context.Context, runID, taskID string) (*TaskDetail,
 	return &d, nil
 }
 
-// CancelRun cancels an in-flight run. It marks tasks that have not started
-// (pending or ready) as cancelled so they are never claimed, then flips the run to
-// cancelled. Tasks already running are left alone: Go cannot forcibly stop a
+// CancelRun cancels an in-flight run. It marks every task that is not currently
+// executing (pending, ready, or failed and awaiting a retry) as cancelled so none
+// of them is ever claimed, then flips the run to cancelled. Tasks already running
+// are left alone: Go cannot forcibly stop a
 // handler, so they finish on their own and their results are dropped, because the
 // completion guards refuse to advance a run that is no longer pending or running.
 // Returns ErrNotFound if the run does not exist, or ErrNotCancellable if it has
@@ -81,11 +82,14 @@ func (s *Store) CancelRun(ctx context.Context, runID string) error {
 		return ErrNotCancellable
 	}
 
-	// Stop everything not yet started from ever being claimed.
+	// Stop everything not currently executing from ever being claimed. 'failed'
+	// belongs in this list because it is a waiting state, not a terminal one: a
+	// failed task still has attempts left and would be picked up the moment its
+	// backoff elapsed, running work for a run that was cancelled.
 	_, err = tx.Exec(ctx,
 		`UPDATE tasks
 		    SET status = 'cancelled', finished_at = now(), error = 'run cancelled'
-		  WHERE run_id = $1 AND status IN ('pending', 'ready')`,
+		  WHERE run_id = $1 AND status IN ('pending', 'ready', 'failed')`,
 		runID,
 	)
 	if err != nil {

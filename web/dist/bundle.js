@@ -23157,13 +23157,46 @@
     return d;
   }
 
+  // src/status.js
+  var STATUS_COLORS = {
+    pending: { fill: "#f8fafc", stroke: "#cbd5e1", text: "#64748b" },
+    ready: { fill: "#eff6ff", stroke: "#3b82f6", text: "#1d4ed8" },
+    running: { fill: "#fffbeb", stroke: "#f59e0b", text: "#b45309" },
+    succeeded: { fill: "#f0fdf4", stroke: "#22c55e", text: "#15803d" },
+    failed: { fill: "#fff7ed", stroke: "#fb923c", text: "#c2410c" },
+    dead: { fill: "#fef2f2", stroke: "#dc2626", text: "#b91c1c" },
+    cancelled: { fill: "#f8fafc", stroke: "#94a3b8", text: "#64748b" }
+  };
+  var STATUS_ORDER = [
+    "pending",
+    "ready",
+    "running",
+    "succeeded",
+    "failed",
+    "dead",
+    "cancelled"
+  ];
+  var UNKNOWN = { fill: "#ffffff", stroke: "#cbd5e1", text: "#64748b" };
+  function statusColors(status) {
+    return STATUS_COLORS[status] ?? UNKNOWN;
+  }
+  var TERMINAL_RUN_STATUSES = /* @__PURE__ */ new Set(["succeeded", "failed", "cancelled"]);
+  function isRunFinished(status) {
+    return TERMINAL_RUN_STATUSES.has(status);
+  }
+
   // src/Dag.jsx
   var NODE_RADIUS = 6;
   var EDGE_COLOR = "#94a3b8";
   var ROOT_COLOR = "#6366f1";
   var NODE_BORDER = "#cbd5e1";
   function Dag({ tasks }) {
-    const { nodes, edges, width, height } = (0, import_react.useMemo)(() => layoutDag(tasks), [tasks]);
+    const topologyKey = (0, import_react.useMemo)(
+      () => tasks.map((t) => `${t.id}:${(t.dependsOn ?? []).join(",")}`).join("|"),
+      [tasks]
+    );
+    const { nodes, edges, width, height } = (0, import_react.useMemo)(() => layoutDag(tasks), [topologyKey]);
+    const currentById = (0, import_react.useMemo)(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
     if (nodes.length === 0) {
       return /* @__PURE__ */ import_react.default.createElement("p", { style: styles.empty }, "This workflow has no tasks.");
     }
@@ -23200,44 +23233,82 @@
           markerEnd: "url(#arrowhead)"
         }
       ))),
-      /* @__PURE__ */ import_react.default.createElement("g", null, nodes.map((n) => {
-        const isRoot = (n.task.dependsOn ?? []).length === 0;
-        return /* @__PURE__ */ import_react.default.createElement("g", { key: n.id }, /* @__PURE__ */ import_react.default.createElement(
-          "rect",
-          {
-            x: n.x,
-            y: n.y,
-            width: n.width,
-            height: n.height,
-            rx: NODE_RADIUS,
-            fill: "#ffffff",
-            stroke: isRoot ? ROOT_COLOR : NODE_BORDER,
-            strokeWidth: isRoot ? 2 : 1.5
-          }
-        ), /* @__PURE__ */ import_react.default.createElement(
-          "text",
-          {
-            x: n.x + n.width / 2,
-            y: n.y + 22,
-            textAnchor: "middle",
-            fontSize: "13",
-            fontWeight: "600",
-            fill: "#0f172a"
-          },
-          n.task.id
-        ), /* @__PURE__ */ import_react.default.createElement(
-          "text",
-          {
-            x: n.x + n.width / 2,
-            y: n.y + 40,
-            textAnchor: "middle",
-            fontSize: "11",
-            fill: "#64748b"
-          },
-          n.task.handler
-        ));
-      }))
+      /* @__PURE__ */ import_react.default.createElement("g", null, nodes.map((n) => /* @__PURE__ */ import_react.default.createElement(TaskNode, { key: n.id, node: n, task: currentById.get(n.id) })))
     ));
+  }
+  function TaskNode({ node, task }) {
+    const { x: x2, y, width, height } = node;
+    if (!task) {
+      return null;
+    }
+    const { status } = task;
+    const isRoot = (task.dependsOn ?? []).length === 0;
+    const colors = status ? statusColors(status) : null;
+    const fill = colors ? colors.fill : "#ffffff";
+    const stroke = colors ? colors.stroke : isRoot ? ROOT_COLOR : NODE_BORDER;
+    const strokeWidth = colors ? 2 : isRoot ? 2 : 1.5;
+    const sublabel = status ?? task.handler;
+    const showAttempt = (task.attempt ?? 0) > 1;
+    return /* @__PURE__ */ import_react.default.createElement("g", null, /* @__PURE__ */ import_react.default.createElement(
+      "rect",
+      {
+        x: x2,
+        y,
+        width,
+        height,
+        rx: NODE_RADIUS,
+        fill,
+        stroke,
+        strokeWidth,
+        strokeDasharray: status === "cancelled" ? "4 3" : void 0
+      },
+      status === "running" && /* @__PURE__ */ import_react.default.createElement(
+        "animate",
+        {
+          attributeName: "stroke-opacity",
+          values: "1;0.3;1",
+          dur: "1.4s",
+          repeatCount: "indefinite"
+        }
+      )
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "text",
+      {
+        x: x2 + width / 2,
+        y: y + 22,
+        textAnchor: "middle",
+        fontSize: "13",
+        fontWeight: "600",
+        fill: "#0f172a"
+      },
+      task.id
+    ), /* @__PURE__ */ import_react.default.createElement(
+      "text",
+      {
+        x: x2 + width / 2,
+        y: y + 40,
+        textAnchor: "middle",
+        fontSize: "11",
+        fontWeight: status ? 600 : 400,
+        fill: colors ? colors.text : "#64748b"
+      },
+      sublabel
+    ), showAttempt && /* @__PURE__ */ import_react.default.createElement("text", { x: x2 + width - 8, y: y + 14, textAnchor: "end", fontSize: "9", fill: "#94a3b8" }, "try ", task.attempt, "/", task.maxAttempts), task.error && /* @__PURE__ */ import_react.default.createElement("title", null, task.error));
+  }
+  function StatusLegend() {
+    return /* @__PURE__ */ import_react.default.createElement("ul", { style: styles.legend }, STATUS_ORDER.map((status) => {
+      const c = statusColors(status);
+      return /* @__PURE__ */ import_react.default.createElement("li", { key: status, style: styles.legendItem }, /* @__PURE__ */ import_react.default.createElement(
+        "span",
+        {
+          style: {
+            ...styles.swatch,
+            background: c.fill,
+            borderColor: c.stroke
+          }
+        }
+      ), /* @__PURE__ */ import_react.default.createElement("span", { style: { color: c.text } }, status));
+    }));
   }
   var styles = {
     wrapper: {
@@ -23255,14 +23326,40 @@
     empty: {
       color: "#64748b",
       fontStyle: "italic"
+    },
+    legend: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: "4px 14px",
+      listStyle: "none",
+      margin: 0,
+      padding: "8px 20px",
+      fontSize: 11,
+      borderTop: "1px solid #e2e8f0"
+    },
+    legendItem: { display: "flex", alignItems: "center", gap: 5 },
+    swatch: {
+      width: 11,
+      height: 11,
+      borderRadius: 3,
+      borderWidth: 1.5,
+      borderStyle: "solid",
+      display: "inline-block"
     }
   };
 
   // src/main.jsx
-  async function getJSON(path, signal) {
-    const res = await fetch(path, { signal });
+  var POLL_MS = 1e3;
+  async function getJSON(path, { signal, method = "GET" } = {}) {
+    const res = await fetch(path, { method, signal });
     if (!res.ok) {
-      throw new Error(`${res.status} ${res.statusText}`);
+      let detail = `${res.status} ${res.statusText}`;
+      try {
+        const body = await res.json();
+        if (body?.error) detail = body.error;
+      } catch {
+      }
+      throw new Error(detail);
     }
     return res.json();
   }
@@ -23270,11 +23367,14 @@
     const [workflows, setWorkflows] = (0, import_react2.useState)([]);
     const [selectedId, setSelectedId] = (0, import_react2.useState)(null);
     const [detail, setDetail] = (0, import_react2.useState)(null);
+    const [runId, setRunId] = (0, import_react2.useState)(null);
+    const [run, setRun] = (0, import_react2.useState)(null);
     const [error, setError] = (0, import_react2.useState)(null);
     const [loading, setLoading] = (0, import_react2.useState)(true);
+    const [triggering, setTriggering] = (0, import_react2.useState)(false);
     (0, import_react2.useEffect)(() => {
       const controller = new AbortController();
-      getJSON("/api/workflows", controller.signal).then((data) => {
+      getJSON("/api/workflows", { signal: controller.signal }).then((data) => {
         setWorkflows(data);
         if (data.length > 0) {
           setSelectedId(data[0].id);
@@ -23291,19 +23391,73 @@
       if (!selectedId) return;
       const controller = new AbortController();
       setDetail(null);
-      getJSON(`/api/workflows/${selectedId}`, controller.signal).then(setDetail).catch((err) => {
+      setRunId(null);
+      setRun(null);
+      getJSON(`/api/workflows/${selectedId}`, { signal: controller.signal }).then(setDetail).catch((err) => {
         if (err.name === "AbortError") return;
         setError(err.message);
       });
       return () => controller.abort();
     }, [selectedId]);
+    (0, import_react2.useEffect)(() => {
+      if (!runId) return;
+      const controller = new AbortController();
+      let stopped = false;
+      let timer;
+      async function poll() {
+        try {
+          const data = await getJSON(`/api/runs/${runId}`, { signal: controller.signal });
+          if (stopped) return;
+          setRun(data);
+          if (!isRunFinished(data.status)) {
+            timer = setTimeout(poll, POLL_MS);
+          }
+        } catch (err) {
+          if (stopped || err.name === "AbortError") return;
+          setError(err.message);
+        }
+      }
+      poll();
+      return () => {
+        stopped = true;
+        controller.abort();
+        clearTimeout(timer);
+      };
+    }, [runId]);
+    const triggerRun = (0, import_react2.useCallback)(async () => {
+      if (!selectedId) return;
+      setTriggering(true);
+      setError(null);
+      try {
+        const { runId: id } = await getJSON(`/api/workflows/${selectedId}/runs`, {
+          method: "POST"
+        });
+        setRun(null);
+        setRunId(id);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setTriggering(false);
+      }
+    }, [selectedId]);
+    const runTasks = (0, import_react2.useMemo)(() => {
+      if (!run) return null;
+      return run.tasks.map((t) => ({
+        id: t.name,
+        handler: t.handler,
+        dependsOn: t.dependsOn,
+        status: t.status,
+        attempt: t.attempt,
+        maxAttempts: t.maxAttempts,
+        error: t.error
+      }));
+    }, [run]);
     if (loading) {
       return /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.notice }, "Loading\u2026");
     }
-    if (error) {
-      return /* @__PURE__ */ import_react2.default.createElement("p", { style: { ...styles2.notice, color: "#b91c1c" } }, "Error: ", error);
-    }
-    return /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.page }, /* @__PURE__ */ import_react2.default.createElement("header", { style: styles2.header }, /* @__PURE__ */ import_react2.default.createElement("h1", { style: styles2.title }, "Weaver")), /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.body }, /* @__PURE__ */ import_react2.default.createElement("nav", { style: styles2.sidebar }, /* @__PURE__ */ import_react2.default.createElement("h2", { style: styles2.sidebarTitle }, "Workflows"), workflows.length === 0 && /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.hint }, "No workflows registered. POST one to ", /* @__PURE__ */ import_react2.default.createElement("code", null, "/api/workflows"), "."), /* @__PURE__ */ import_react2.default.createElement("ul", { style: styles2.list }, workflows.map((wf) => /* @__PURE__ */ import_react2.default.createElement("li", { key: wf.id }, /* @__PURE__ */ import_react2.default.createElement(
+    const showingRun = Boolean(runId);
+    const tasks = showingRun ? runTasks : detail?.tasks;
+    return /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.page }, /* @__PURE__ */ import_react2.default.createElement("header", { style: styles2.header }, /* @__PURE__ */ import_react2.default.createElement("h1", { style: styles2.title }, "Weaver")), error && /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.errorBar }, error, /* @__PURE__ */ import_react2.default.createElement("button", { onClick: () => setError(null), style: styles2.dismiss }, "dismiss")), /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.body }, /* @__PURE__ */ import_react2.default.createElement("nav", { style: styles2.sidebar }, /* @__PURE__ */ import_react2.default.createElement("h2", { style: styles2.sidebarTitle }, "Workflows"), workflows.length === 0 && /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.hint }, "No workflows registered. POST one to ", /* @__PURE__ */ import_react2.default.createElement("code", null, "/api/workflows"), "."), /* @__PURE__ */ import_react2.default.createElement("ul", { style: styles2.list }, workflows.map((wf) => /* @__PURE__ */ import_react2.default.createElement("li", { key: wf.id }, /* @__PURE__ */ import_react2.default.createElement(
       "button",
       {
         onClick: () => setSelectedId(wf.id),
@@ -23314,7 +23468,34 @@
       },
       /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfName }, wf.name),
       /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfMeta }, "v", wf.version, wf.schedule ? ` \xB7 ${wf.schedule}` : "")
-    ))))), /* @__PURE__ */ import_react2.default.createElement("main", { style: styles2.canvas }, detail ? /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.canvasHeader }, /* @__PURE__ */ import_react2.default.createElement("strong", null, detail.name), /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfMeta }, detail.tasks.length, " task", detail.tasks.length === 1 ? "" : "s")), /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.canvasBody }, /* @__PURE__ */ import_react2.default.createElement(Dag, { tasks: detail.tasks }))) : /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.notice }, selectedId ? "Loading graph\u2026" : "Select a workflow."))));
+    ))))), /* @__PURE__ */ import_react2.default.createElement("main", { style: styles2.canvas }, detail ? /* @__PURE__ */ import_react2.default.createElement(import_react2.default.Fragment, null, /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.canvasHeader }, /* @__PURE__ */ import_react2.default.createElement("strong", null, detail.name), showingRun ? /* @__PURE__ */ import_react2.default.createElement(RunSummary, { run }) : /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfMeta }, detail.tasks.length, " task", detail.tasks.length === 1 ? "" : "s"), /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.spacer }), showingRun && /* @__PURE__ */ import_react2.default.createElement(
+      "button",
+      {
+        onClick: () => {
+          setRunId(null);
+          setRun(null);
+        },
+        style: styles2.secondaryButton
+      },
+      "Back to definition"
+    ), /* @__PURE__ */ import_react2.default.createElement(
+      "button",
+      {
+        onClick: triggerRun,
+        disabled: triggering,
+        style: styles2.primaryButton
+      },
+      triggering ? "Triggering\u2026" : "Trigger run"
+    )), /* @__PURE__ */ import_react2.default.createElement("div", { style: styles2.canvasBody }, tasks ? /* @__PURE__ */ import_react2.default.createElement(Dag, { tasks }) : /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.notice }, "Waiting for the run to appear\u2026")), showingRun && /* @__PURE__ */ import_react2.default.createElement(StatusLegend, null)) : /* @__PURE__ */ import_react2.default.createElement("p", { style: styles2.notice }, selectedId ? "Loading graph\u2026" : "Select a workflow."))));
+  }
+  function RunSummary({ run }) {
+    if (!run) {
+      return /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfMeta }, "starting\u2026");
+    }
+    const succeeded = run.tasks.filter((t) => t.status === "succeeded").length;
+    const live = !isRunFinished(run.status);
+    const c = statusColors(run.status);
+    return /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.runSummary }, /* @__PURE__ */ import_react2.default.createElement("span", { style: { ...styles2.pill, background: c.fill, borderColor: c.stroke, color: c.text } }, run.status), /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfMeta }, succeeded, "/", run.tasks.length, " succeeded"), /* @__PURE__ */ import_react2.default.createElement("span", { style: styles2.wfMeta }, live ? "\xB7 polling" : "\xB7 finished"));
   }
   var styles2 = {
     page: {
@@ -23329,6 +23510,24 @@
       borderBottom: "1px solid #e2e8f0"
     },
     title: { margin: 0, fontSize: 18 },
+    errorBar: {
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "8px 20px",
+      background: "#fef2f2",
+      color: "#b91c1c",
+      borderBottom: "1px solid #fecaca",
+      fontSize: 13
+    },
+    dismiss: {
+      border: "none",
+      background: "none",
+      color: "#b91c1c",
+      textDecoration: "underline",
+      cursor: "pointer",
+      font: "inherit"
+    },
     // The graph panel needs a real height to scale into, so the body is a flex row
     // that fills what is left of the viewport. minHeight: 0 is the flexbox quirk that
     // lets a flex child actually shrink instead of overflowing its parent.
@@ -23371,12 +23570,42 @@
     canvas: { flex: 1, display: "flex", flexDirection: "column", minWidth: 0 },
     canvasHeader: {
       display: "flex",
-      alignItems: "baseline",
+      alignItems: "center",
       gap: 10,
-      padding: "12px 20px",
+      padding: "10px 20px",
       borderBottom: "1px solid #e2e8f0"
     },
+    spacer: { flex: 1 },
     canvasBody: { flex: 1, minHeight: 0, padding: 20, background: "#f8fafc" },
+    runSummary: { display: "flex", alignItems: "center", gap: 8 },
+    pill: {
+      fontSize: 11,
+      fontWeight: 600,
+      padding: "1px 8px",
+      borderRadius: 999,
+      borderWidth: 1,
+      borderStyle: "solid"
+    },
+    primaryButton: {
+      padding: "6px 12px",
+      borderRadius: 6,
+      border: "1px solid #4f46e5",
+      background: "#4f46e5",
+      color: "#ffffff",
+      font: "inherit",
+      fontSize: 13,
+      cursor: "pointer"
+    },
+    secondaryButton: {
+      padding: "6px 12px",
+      borderRadius: 6,
+      border: "1px solid #cbd5e1",
+      background: "#ffffff",
+      color: "#0f172a",
+      font: "inherit",
+      fontSize: 13,
+      cursor: "pointer"
+    },
     notice: { padding: 20, color: "#64748b" },
     hint: { fontSize: 12, color: "#64748b" }
   };

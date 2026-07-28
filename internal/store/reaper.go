@@ -40,8 +40,8 @@ type expiredLease struct {
 
 // ReapExpiredLeases recovers tasks stranded by dead workers. It finds every
 // Running task whose lease has expired -- the worker holding it stopped
-// heartbeating, so it is presumed gone -- and either returns the task to Ready
-// for another worker or, if it has no attempts left, marks it Dead.
+// heartbeating, so it is presumed gone -- and either hands the task back for
+// another attempt or, if it has no attempts left, marks it Dead.
 //
 // The attempt check is what stops a genuinely poisonous task (one that reliably
 // kills whatever worker claims it) from being reclaimed forever: each claim has
@@ -111,14 +111,25 @@ func (s *Store) ReapExpiredLeases(ctx context.Context) (requeued, killed int, er
 	return requeued, killed, nil
 }
 
-// reapRequeue returns a stranded task to Ready and drops its dead lease, in the
-// reaper's transaction. scheduled_at = now() makes it immediately claimable and
-// started_at is cleared so the next attempt times itself from scratch. The error
-// note records why it came back, for the UI and logs; a later success clears it.
+// reapRequeue hands a stranded task back for another attempt and drops its dead
+// lease, in the reaper's transaction. started_at is cleared so the next attempt
+// times itself from scratch. The error note records why it came back, for the UI
+// and logs; a later success clears it.
+//
+// The status is Failed, the same as a task whose handler returned an error, because
+// the two mean the same thing: an attempt happened and did not finish, and another
+// is coming. That keeps one meaning for each state -- Ready is "never attempted
+// since it was unblocked", Failed is "an attempt is behind it" -- so a task's status
+// alone says which it is, with no need to read the error column to find out.
+//
+// Unlike a handler failure this gets no backoff: scheduled_at = now() makes it
+// claimable immediately. A dead worker is not evidence that the task itself is
+// slow to settle, so there is nothing to wait out. The attempt ceiling is what
+// stops a task that reliably kills workers from cycling forever.
 func reapRequeue(ctx context.Context, tx pgx.Tx, taskID string) error {
 	_, err := tx.Exec(ctx,
 		`UPDATE tasks
-		    SET status = 'ready',
+		    SET status = 'failed',
 		        started_at = NULL,
 		        scheduled_at = now(),
 		        error = 'worker lease expired; requeued by reaper'

@@ -74,10 +74,15 @@ func (s *Store) CompleteTask(ctx context.Context, task *ClaimedTask, workerID st
 }
 
 // FailTask records a failed task run in one transaction. If attempts remain it
-// releases the lease and returns the task to Ready with a backoff delay, so the
-// same row becomes claimable again once its scheduled_at passes. If attempts are
+// releases the lease and leaves the task Failed with a backoff delay, so the same
+// row becomes claimable again once its scheduled_at passes. If attempts are
 // exhausted it marks the task Dead and fails the run, since a dead task means the
 // run can never fully succeed.
+//
+// Failed is a waiting state here, not a terminal one: it means "the last attempt
+// failed and another is coming". Dead is the terminal one. Keeping them apart is
+// what lets a caller tell a task that is retrying from one that has given up, and
+// from one that is merely queued behind a busy worker pool.
 //
 // cause is the error (or timeout, or panic) message, recorded on the task so the
 // UI and logs can show why it failed.
@@ -103,9 +108,12 @@ func (s *Store) FailTask(ctx context.Context, task *ClaimedTask, workerID, cause
 		// transient failure gets time to clear, and a stampede of tasks that
 		// failed together is spread out by the jitter in backoffDelay.
 		delay := backoffDelay(task.Attempt)
+		// finished_at stays NULL: the task is between attempts, not finished. The
+		// error is kept so the reason for the retry is visible while it waits, and
+		// CompleteTask clears it if the next attempt works.
 		_, err = tx.Exec(ctx,
 			`UPDATE tasks
-			    SET status = 'ready',
+			    SET status = 'failed',
 			        error = $2,
 			        started_at = NULL,
 			        scheduled_at = now() + make_interval(secs => $3)

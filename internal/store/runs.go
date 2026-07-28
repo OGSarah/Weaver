@@ -24,6 +24,7 @@ type TaskState struct {
 	StartedAt   *time.Time // nil until a worker claims it
 	FinishedAt  *time.Time // nil while still in flight
 	Error       *string    // nil unless the last attempt failed
+	DependsOn   []string   // upstream task names, so the UI can draw the run's DAG
 }
 
 // RunState is a run plus every task in it.
@@ -37,8 +38,9 @@ type RunState struct {
 	Tasks      []TaskState
 }
 
-// GetRunState returns a run and all of its tasks. Two queries rather than a
-// join, so run fields are not repeated on every task row.
+// GetRunState returns a run, all of its tasks, and the dependency edges between
+// them. Three queries rather than one join, so run fields are not repeated on every
+// task row and a task with several upstreams stays a single row.
 func (s *Store) GetRunState(ctx context.Context, runID string) (*RunState, error) {
 	var r RunState
 	err := s.pool.QueryRow(ctx,
@@ -81,6 +83,47 @@ func (s *Store) GetRunState(ctx context.Context, runID string) (*RunState, error
 	// Errors during iteration surface here, not from Scan.
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterate tasks: %w", err)
+	}
+
+	// The edges. These come from the dependencies rows rather than from the
+	// workflow definition on purpose: those rows are what the scheduler consults to
+	// decide what is ready, so a graph drawn from them cannot disagree with what is
+	// actually going to run.
+	//
+	// Upstreams are returned as task names because a name is what identifies a task
+	// within a run (the UNIQUE (run_id, name) constraint), and it is stable across
+	// runs, whereas the row's UUID is regenerated for every run.
+	depRows, err := s.pool.Query(ctx,
+		`SELECT down.name, up.name
+		   FROM dependencies d
+		   JOIN tasks up   ON up.id   = d.upstream_task_id
+		   JOIN tasks down ON down.id = d.downstream_task_id
+		  WHERE d.run_id = $1
+		  ORDER BY down.name, up.name`,
+		runID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query dependencies: %w", err)
+	}
+	defer depRows.Close()
+
+	// Downstream task name -> the names it waits on.
+	upstreams := make(map[string][]string)
+	for depRows.Next() {
+		var downstream, upstream string
+		if err := depRows.Scan(&downstream, &upstream); err != nil {
+			return nil, fmt.Errorf("scan dependency: %w", err)
+		}
+		upstreams[downstream] = append(upstreams[downstream], upstream)
+	}
+	if err := depRows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate dependencies: %w", err)
+	}
+
+	// Attach by index: ranging by value would copy each task and the assignment
+	// would be thrown away.
+	for i := range r.Tasks {
+		r.Tasks[i].DependsOn = upstreams[r.Tasks[i].Name]
 	}
 
 	return &r, nil

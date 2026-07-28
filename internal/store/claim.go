@@ -27,7 +27,7 @@ type ClaimedTask struct {
 // The whole thing is one transaction so the three facts it establishes -- this
 // row is mine, it is now running, and a lease proves I hold it -- either all
 // become true together or none do. A crash between them leaves the task exactly
-// as it was, Ready for someone else.
+// as it was, still claimable by someone else.
 //
 // The select uses FOR UPDATE SKIP LOCKED: FOR UPDATE takes a row lock on the
 // task it picks, and SKIP LOCKED tells Postgres to step over any row another
@@ -42,19 +42,26 @@ func (s *Store) ClaimTask(ctx context.Context, workerID string, leaseTTL time.Du
 	// Rolls back unless Commit already ran, in which case it is a no-op.
 	defer tx.Rollback(ctx)
 
+	// Two statuses are claimable, and the difference between them is history, not
+	// eligibility: 'ready' has never been attempted since it was unblocked, 'failed'
+	// has an attempt behind it and is waiting out its backoff. scheduled_at is what
+	// actually gates both -- it is now() for a ready task and a point in the future
+	// for a failed one -- so a retry becomes claimable the moment its delay elapses,
+	// with nothing needed in between to promote it.
 	var ct ClaimedTask
 	err = tx.QueryRow(ctx,
 		`SELECT id, run_id, name, handler, attempt, max_attempts, timeout_seconds
 		   FROM tasks
-		  WHERE status = 'ready'
+		  WHERE status IN ('ready', 'failed')
 		    AND scheduled_at <= now()
 		  ORDER BY scheduled_at
 		  FOR UPDATE SKIP LOCKED
 		  LIMIT 1`,
 	).Scan(&ct.ID, &ct.RunID, &ct.Name, &ct.Handler, &ct.Attempt, &ct.MaxAttempts, &ct.TimeoutSeconds)
 	if err != nil {
-		// No unlocked Ready task: the queue is empty or fully claimed. Not an
-		// error -- the caller polls again shortly.
+		// Nothing claimable: the queue is empty, fully claimed, or everything left
+		// is still waiting out a backoff. Not an error -- the caller polls again
+		// shortly.
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}

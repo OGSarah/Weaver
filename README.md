@@ -126,13 +126,39 @@ stateDiagram-v2
     Pending --> Ready: all upstream tasks succeeded
     Ready --> Running: worker claims lease
     Running --> Succeeded: task returns ok
-    Running --> Failed: error or timeout
-    Failed --> Ready: retries remaining, backoff elapsed
-    Failed --> Dead: retries exhausted
-    Running --> Ready: lease expired (worker died)
+    Running --> Failed: error or timeout, retries remaining
+    Failed --> Running: backoff elapsed, worker claims lease
+    Running --> Dead: error or timeout, retries exhausted
+    Running --> Failed: lease expired (worker died), retries remaining
+    Running --> Dead: lease expired, retries exhausted
+    Pending --> Cancelled: run cancelled
+    Ready --> Cancelled: run cancelled
+    Failed --> Cancelled: run cancelled
     Succeeded --> [*]
     Dead --> [*]
+    Cancelled --> [*]
 ```
+ 
+Two of these states are easy to misread. **Failed is a waiting state, not a terminal
+one:** it means an attempt happened and did not finish, and another is coming. Dead
+is the terminal one, reached when the attempts are spent. Keeping them apart is what
+lets you tell a task that is retrying from one that has given up, and both from a
+task that is merely queued behind a busy worker pool.
+
+Every state has exactly one meaning, which is why a dead worker's task also lands in
+Failed rather than going back to Ready. Ready means "never attempted since it was
+unblocked"; Failed means "an attempt is behind it". A task's status alone tells you
+which, with no need to read its error column to find out. The two paths into Failed
+differ only in when the next attempt may start: a handler error backs off
+exponentially, while a task reclaimed from a dead worker is claimable immediately,
+since a worker dying is no evidence the task itself needs time to settle.
+ 
+Because Failed is a waiting state, it is *claimable*. The claim query selects on
+`status IN ('ready', 'failed') AND scheduled_at <= now()`, so a retry becomes
+eligible the moment its delay passes, with no background sweep needed to promote it
+back to Ready. It also means cancelling a run has to cancel Failed tasks alongside
+Pending and Ready ones, or a cancelled run would still have work picked up when its
+backoff elapsed.
  
 ### Execution flow for a single run
  
@@ -275,7 +301,8 @@ GET    /api/workflows              list workflows (metadata only, no task lists)
 GET    /api/workflows/:id          fetch one workflow with its full task list,
                                    including the dependency edges the UI draws
 POST   /api/workflows/:id/runs     trigger a run
-GET    /api/runs/:id               fetch run status and task states
+GET    /api/runs/:id               fetch run status, task states, and the
+                                   dependency edges between them
 GET    /api/runs/:id/tasks/:tid    fetch a single task, including logs
 POST   /api/runs/:id/cancel        cancel an in-flight run
 

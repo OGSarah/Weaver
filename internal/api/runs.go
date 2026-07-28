@@ -25,6 +25,10 @@ type taskResponse struct {
 	StartedAt   string  `json:"startedAt,omitempty"`
 	FinishedAt  string  `json:"finishedAt,omitempty"`
 	Error       *string `json:"error,omitempty"`
+	// Upstream task names. Together with the task list this makes a run response
+	// self-contained: the UI can draw the DAG and colour it from one poll, with no
+	// second request for the workflow definition.
+	DependsOn []string `json:"dependsOn,omitempty"`
 }
 
 // runResponse is a run plus every task in it, the shape GET /runs/{id} returns.
@@ -130,6 +134,7 @@ func toTaskResponse(t store.TaskState) taskResponse {
 		StartedAt:   fmtTime(t.StartedAt),
 		FinishedAt:  fmtTime(t.FinishedAt),
 		Error:       t.Error,
+		DependsOn:   t.DependsOn,
 	}
 }
 

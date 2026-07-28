@@ -91,7 +91,7 @@ Make a run actually flow from start to finish, including when tasks fail.
 - [x] In that same transaction, check each downstream task and mark it Ready if all of its upstreams have now Succeeded.
 - [x] When the last task in a run finishes, mark the run itself as complete.
 - [x] On handler error or panic: mark the task Failed and record the error message.
-- [x] Implement retries: if attempts remain, schedule the task to become Ready again after an exponential backoff delay (add jitter). If attempts are exhausted, mark it Dead.
+- [x] Implement retries: if attempts remain, leave the task Failed with a scheduled_at an exponential backoff into the future (add jitter), so it is claimable again once that passes. If attempts are exhausted, mark it Dead.
 - [x] Implement timeouts: if a handler runs longer than the task's timeout, treat it as a failure.
 - [x] Test a full happy-path run end to end, then a run where one task fails and retries, then one where a task exhausts its retries.
 
@@ -104,7 +104,7 @@ You should understand: at-least-once execution and why it forces your handlers t
 The senior-level payoff. Prove that a run resumes when a worker dies mid-task.
 
 - [x] Add heartbeats: while a handler runs, periodically extend the lease's expires_at.
-- [x] Write the reaper: a routine that finds Running tasks whose lease has expired and returns them to Ready.
+- [x] Write the reaper: a routine that finds Running tasks whose lease has expired and hands them back for another attempt (Failed, claimable immediately), or marks them Dead if no attempts remain.
 - [x] Run the reaper on a timer inside the scheduler binary.
 - [x] Chaos test: start a run, then hard-kill a worker (not a graceful shutdown) while it holds a task. Confirm the reaper reclaims the task and another worker finishes it.
 - [x] Confirm the reclaimed task respects its attempt count so a genuinely stuck task cannot loop forever.
@@ -150,7 +150,7 @@ Scaffold the React app with your own build:
 Then build the views:
  
 - [x] Render a workflow as a DAG using a graph library, so dependencies are visible.
-- [ ] Show a run's live status: color each task node by state (Pending, Ready, Running, Succeeded, Failed, Dead) and poll for updates.
+- [x] Show a run's live status: color each task node by state (Pending, Ready, Running, Succeeded, Failed, Dead) and poll for updates.
 - [ ] Add a run history view and a per-task log/detail panel.
 - [ ] Write a README section documenting how to run the whole thing locally, including the frontend build step.
 Stretch goals:

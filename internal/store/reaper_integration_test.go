@@ -33,8 +33,8 @@ func leaseCount(t *testing.T, s *Store, taskID string) int {
 }
 
 // TestReaperRequeuesDeadWorkersTask simulates a worker dying mid-task: it claims
-// a task, its lease expires, and the reaper returns the task to Ready so another
-// worker can finish it. This is the Phase 6 payoff in miniature.
+// a task, its lease expires, and the reaper hands the task back so another worker
+// can finish it. This is the Phase 6 payoff in miniature.
 func TestReaperRequeuesDeadWorkersTask(t *testing.T) {
 	s := newTestStore(t)
 	ctx := context.Background()
@@ -53,14 +53,21 @@ func TestReaperRequeuesDeadWorkersTask(t *testing.T) {
 	expireLease(t, s, ct.ID)
 
 	// Counts are global to the shared test database, so assert on this task's
-	// outcome, not the totals: Ready (not Dead) proves it was requeued.
+	// outcome, not the totals: Failed (not Dead) proves it was requeued rather
+	// than killed. Failed is the same state a handler error leaves behind -- an
+	// attempt happened and another is coming -- and it is claimable, which the
+	// next step relies on.
 	if _, _, err := s.ReapExpiredLeases(ctx); err != nil {
 		t.Fatalf("reap: %v", err)
 	}
 
 	job := statusByName(t, s, runID)["job"]
-	if job.Status != "ready" {
-		t.Fatalf("reclaimed task: want ready, got %s", job.Status)
+	if job.Status != "failed" {
+		t.Fatalf("reclaimed task: want failed, got %s", job.Status)
+	}
+	// Requeued for immediate retry, unlike a handler failure which backs off.
+	if job.ScheduledAt.After(time.Now()) {
+		t.Errorf("reaped task should be claimable now, scheduled for %s", job.ScheduledAt)
 	}
 	if leaseCount(t, s, ct.ID) != 0 {
 		t.Errorf("reaper should have deleted the dead lease")
@@ -98,7 +105,7 @@ func TestReaperKillsExhaustedTask(t *testing.T) {
 	}
 	expireLease(t, s, ct.ID)
 
-	// Assert on this task, not the global counts: Dead (not Ready) proves the
+	// Assert on this task, not the global counts: Dead (not Failed) proves the
 	// reaper refused to requeue a task with no attempts left.
 	if _, _, err := s.ReapExpiredLeases(ctx); err != nil {
 		t.Fatalf("reap: %v", err)

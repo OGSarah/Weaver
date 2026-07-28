@@ -174,9 +174,11 @@ func TestRunRetryThenSucceed(t *testing.T) {
 		t.Fatalf("fail: %v", err)
 	}
 
+	// Failed, not ready: the attempt is behind it and the next one is waiting on
+	// the backoff below, which is a different thing from sitting in the queue.
 	flaky := statusByName(t, s, runID)["flaky"]
-	if flaky.Status != "ready" {
-		t.Fatalf("after retry-eligible failure: want ready, got %s", flaky.Status)
+	if flaky.Status != "failed" {
+		t.Fatalf("after retry-eligible failure: want failed, got %s", flaky.Status)
 	}
 	if flaky.Error == nil || *flaky.Error != "boom" {
 		t.Errorf("want error recorded as boom, got %v", flaky.Error)
@@ -238,8 +240,8 @@ func TestRunExhaustRetries(t *testing.T) {
 	if err := s.FailTask(ctx, ct, "w1", "fail 1"); err != nil {
 		t.Fatalf("fail 1: %v", err)
 	}
-	if got := statusByName(t, s, runID)["doomed"].Status; got != "ready" {
-		t.Fatalf("after attempt 1: want ready, got %s", got)
+	if got := statusByName(t, s, runID)["doomed"].Status; got != "failed" {
+		t.Fatalf("after attempt 1: want failed, got %s", got)
 	}
 	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET scheduled_at = now() WHERE run_id = $1`, runID); err != nil {
 		t.Fatalf("fast-forward backoff: %v", err)
@@ -283,6 +285,47 @@ func TestRunExhaustRetries(t *testing.T) {
 		t.Fatalf("claim after dead: %v", err)
 	} else if ct != nil && ct.RunID == runID {
 		t.Errorf("dead task was claimed again as attempt %d", ct.Attempt)
+	}
+}
+
+// TestCancelRunCancelsTaskAwaitingRetry covers the trap in making Failed a
+// waiting state rather than a terminal one: a task between attempts still has
+// attempts left, so cancelling its run has to stop it too. Miss it and the task
+// sits in Failed until its backoff elapses, then gets claimed and runs work for a
+// run that was cancelled.
+func TestCancelRunCancelsTaskAwaitingRetry(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	runID := seedRun(t, s, workflow.WorkflowDef{
+		Name:  fmt.Sprintf("cancel-retry-%d", time.Now().UnixNano()),
+		Tasks: []workflow.TaskDef{{ID: "flaky", Handler: "h", Retries: 3}},
+	})
+
+	// Fail once so the task is waiting out a backoff with attempts to spare.
+	ct := claimOne(t, s, "w1", runID)
+	if err := s.FailTask(ctx, ct, "w1", "boom"); err != nil {
+		t.Fatalf("fail: %v", err)
+	}
+	if got := statusByName(t, s, runID)["flaky"].Status; got != "failed" {
+		t.Fatalf("setup: want failed, got %s", got)
+	}
+
+	if err := s.CancelRun(ctx, runID); err != nil {
+		t.Fatalf("cancel: %v", err)
+	}
+	if got := statusByName(t, s, runID)["flaky"].Status; got != "cancelled" {
+		t.Fatalf("after cancel: want cancelled, got %s", got)
+	}
+
+	// The real assertion: even once the backoff has elapsed, nothing is claimable.
+	if _, err := s.pool.Exec(ctx, `UPDATE tasks SET scheduled_at = now() WHERE run_id = $1`, runID); err != nil {
+		t.Fatalf("fast-forward backoff: %v", err)
+	}
+	if ct, err := s.ClaimTask(ctx, "w1", 30*time.Second); err != nil {
+		t.Fatalf("claim after cancel: %v", err)
+	} else if ct != nil && ct.RunID == runID {
+		t.Errorf("cancelled task was claimed as attempt %d", ct.Attempt)
 	}
 }
 
