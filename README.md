@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/branding/weaver-wordmark.png" alt="Weaver" width="600">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<img src="docs/branding/weaver-wordmark.png" alt="Weaver" width="600">
 </p>
 
 <p align="center">
@@ -8,6 +8,16 @@
 </p>
 
 A DAG-based job scheduler and workflow orchestrator. Weaver lets you define workflows as directed acyclic graphs of tasks, schedule them, execute them across a pool of workers, and recover automatically when things fail. Think of it as a small, readable, from-scratch take on the ideas behind Airflow and Temporal.
+
+## Features
+
+- Defines workflows as DAGs in JSON or via the API, with per-task dependencies.
+- Cron-style scheduling plus manual and API-triggered runs.
+- A worker pool that claims tasks using row-level locking (no double execution).
+- Configurable retries, backoff, and per-task timeouts.
+- Automatic recovery of tasks orphaned by dead workers.
+- A React UI that renders the DAG, shows live run status, and exposes logs and run history.
+- A REST API for triggering runs, inspecting state, and managing workflow definitions.
 
 <details>
 <summary><h2>Understanding DAGS</h2></summary>
@@ -52,9 +62,7 @@ The worker loop is essentially:
 
 Because of this, one of the first things Weaver does when a workflow is submitted is validate that it is actually a DAG, rejecting any definition that contains a cycle before it ever tries to run. Cycle detection is a classic depth-first-search problem.
 
-</details>
-
-## Glossary
+### Glossary
 
 - `Node` (or vertex): A single task.
 - `Edge`: A dependency arrow between two tasks.
@@ -63,15 +71,7 @@ Because of this, one of the first things Weaver does when a workflow is submitte
 - `Root task`: A task with no upstream dependencies. These are what the scheduler kicks off first when a run starts.
 - `Topological sort`: Any ordering of the tasks that respects all the dependency arrows.
 
-## Features
- 
-- Defines workflows as DAGs in JSON or via the API, with per-task dependencies.
-- Cron-style scheduling plus manual and API-triggered runs.
-- A worker pool that claims tasks using row-level locking (no double execution).
-- Configurable retries, backoff, and per-task timeouts.
-- Automatic recovery of tasks orphaned by dead workers.
-- A React UI that renders the DAG, shows live run status, and exposes logs and run history.
-- A REST API for triggering runs, inspecting state, and managing workflow definitions.
+</details>
 
 <details>
 <summary><h2>Architecture</h2></summary>
@@ -524,10 +524,8 @@ GET    /healthz                    liveness probe (not under /api: it is an
                                    infrastructure concern, not part of the UI's API)
 ```
 
-</details>
+### Example workflow definition
 
-## Example workflow definition
- 
 ```json
 {
   "name": "daily-report",
@@ -540,6 +538,8 @@ GET    /healthz                    liveness probe (not under /api: it is an
   ]
 }
 ```
+
+</details>
 
 <details>
 <summary><h2>Trying the API</h2></summary>
