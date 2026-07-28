@@ -1,0 +1,15 @@
+# Node dependencies. The lockfile (web/package-lock.json) is committed instead, so
+# installs are reproducible without carrying the tree itself.
+node_modules/
+
+# The built bundle IS committed on purpose: it lets a fresh clone run
+# `docker compose up` and get a working UI with no npm step. See the "Tradeoffs and
+# decisions" section of the README.
+# web/dist/
+
+# macOS directory metadata.
+.DS_Store
+
+# Local environment overrides.
+.env
+.env.local

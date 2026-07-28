@@ -29,9 +29,9 @@
     mod
   ));
 
-  // ../node_modules/react/cjs/react.development.js
+  // node_modules/react/cjs/react.development.js
   var require_react_development = __commonJS({
-    "../node_modules/react/cjs/react.development.js"(exports, module) {
+    "node_modules/react/cjs/react.development.js"(exports, module) {
       "use strict";
       (function() {
         function defineDeprecationWarning(methodName, info) {
@@ -1001,9 +1001,9 @@
     }
   });
 
-  // ../node_modules/react/index.js
+  // node_modules/react/index.js
   var require_react = __commonJS({
-    "../node_modules/react/index.js"(exports, module) {
+    "node_modules/react/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1013,9 +1013,9 @@
     }
   });
 
-  // ../node_modules/scheduler/cjs/scheduler.development.js
+  // node_modules/scheduler/cjs/scheduler.development.js
   var require_scheduler_development = __commonJS({
-    "../node_modules/scheduler/cjs/scheduler.development.js"(exports) {
+    "node_modules/scheduler/cjs/scheduler.development.js"(exports) {
       "use strict";
       (function() {
         function performWorkUntilDeadline() {
@@ -1272,9 +1272,9 @@
     }
   });
 
-  // ../node_modules/scheduler/index.js
+  // node_modules/scheduler/index.js
   var require_scheduler = __commonJS({
-    "../node_modules/scheduler/index.js"(exports, module) {
+    "node_modules/scheduler/index.js"(exports, module) {
       "use strict";
       if (false) {
         module.exports = null;
@@ -1284,9 +1284,9 @@
     }
   });
 
-  // ../node_modules/react-dom/cjs/react-dom.development.js
+  // node_modules/react-dom/cjs/react-dom.development.js
   var require_react_dom_development = __commonJS({
-    "../node_modules/react-dom/cjs/react-dom.development.js"(exports) {
+    "node_modules/react-dom/cjs/react-dom.development.js"(exports) {
       "use strict";
       (function() {
         function noop() {
@@ -1528,9 +1528,9 @@
     }
   });
 
-  // ../node_modules/react-dom/index.js
+  // node_modules/react-dom/index.js
   var require_react_dom = __commonJS({
-    "../node_modules/react-dom/index.js"(exports, module) {
+    "node_modules/react-dom/index.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -1541,9 +1541,9 @@
     }
   });
 
-  // ../node_modules/react-dom/cjs/react-dom-client.development.js
+  // node_modules/react-dom/cjs/react-dom-client.development.js
   var require_react_dom_client_development = __commonJS({
-    "../node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
+    "node_modules/react-dom/cjs/react-dom-client.development.js"(exports) {
       "use strict";
       (function() {
         function findHook(fiber, id) {
@@ -21440,9 +21440,9 @@
     }
   });
 
-  // ../node_modules/react-dom/client.js
+  // node_modules/react-dom/client.js
   var require_client = __commonJS({
-    "../node_modules/react-dom/client.js"(exports, module) {
+    "node_modules/react-dom/client.js"(exports, module) {
       "use strict";
       if (false) {
         checkDCE();
@@ -21457,7 +21457,29 @@
   var import_react = __toESM(require_react(), 1);
   var import_client = __toESM(require_client(), 1);
   function App() {
-    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h1", null, "Weaver"), /* @__PURE__ */ import_react.default.createElement("p", null, "Frontend is wired up."));
+    const [status, setStatus] = (0, import_react.useState)("loading");
+    const [workflows, setWorkflows] = (0, import_react.useState)([]);
+    (0, import_react.useEffect)(() => {
+      const controller = new AbortController();
+      fetch("/api/workflows", { signal: controller.signal }).then((res) => {
+        if (!res.ok) {
+          throw new Error(`${res.status} ${res.statusText}`);
+        }
+        return res.json();
+      }).then((data) => {
+        console.log("GET /api/workflows ->", data);
+        setWorkflows(data);
+        setStatus("ok");
+      }).catch((err) => {
+        if (err.name === "AbortError") {
+          return;
+        }
+        console.error("GET /api/workflows failed:", err);
+        setStatus(`failed (${err.message})`);
+      });
+      return () => controller.abort();
+    }, []);
+    return /* @__PURE__ */ import_react.default.createElement("div", null, /* @__PURE__ */ import_react.default.createElement("h1", null, "Weaver"), /* @__PURE__ */ import_react.default.createElement("p", null, "Frontend is wired up."), /* @__PURE__ */ import_react.default.createElement("p", null, "API: ", status, status === "ok" && `, ${workflows.length} workflow(s)`));
   }
   var container = document.getElementById("root");
   var root = (0, import_client.createRoot)(container);

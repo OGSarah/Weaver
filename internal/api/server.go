@@ -13,26 +13,48 @@ import (
 // the store handle; every request reads or writes the database directly, which is
 // what keeps the API a thin layer over the single source of truth.
 type Server struct {
-	store *store.Store
+	store  *store.Store
+	webDir string
 }
 
-// NewServer builds a Server backed by the given store.
-func NewServer(s *store.Store) *Server {
-	return &Server{store: s}
+// NewServer builds a Server backed by the given store, serving the built frontend
+// out of webDir.
+func NewServer(s *store.Store, webDir string) *Server {
+	return &Server{store: s, webDir: webDir}
 }
 
 // Handler wires the routes onto a ServeMux. The method+path patterns are the
 // standard-library router (Go 1.22+): no framework needed, and path wildcards like
 // {id} are read back with r.PathValue.
+//
+// Every API route lives under /api so everything else can fall through to the static
+// file server. That one prefix is what lets the UI and the API share an origin: no
+// CORS, no dev proxy, and the browser can fetch a bare "/api/workflows".
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /workflows", s.handleRegisterWorkflow)
-	mux.HandleFunc("GET /workflows", s.handleListWorkflows)
-	mux.HandleFunc("POST /workflows/{id}/runs", s.handleTriggerRun)
-	mux.HandleFunc("GET /runs/{id}", s.handleGetRun)
-	mux.HandleFunc("GET /runs/{id}/tasks/{tid}", s.handleGetTask)
-	mux.HandleFunc("POST /runs/{id}/cancel", s.handleCancelRun)
+	mux.HandleFunc("POST /api/workflows", s.handleRegisterWorkflow)
+	mux.HandleFunc("GET /api/workflows", s.handleListWorkflows)
+	mux.HandleFunc("POST /api/workflows/{id}/runs", s.handleTriggerRun)
+	mux.HandleFunc("GET /api/runs/{id}", s.handleGetRun)
+	mux.HandleFunc("GET /api/runs/{id}/tasks/{tid}", s.handleGetTask)
+	mux.HandleFunc("POST /api/runs/{id}/cancel", s.handleCancelRun)
+
+	// Health stays at the root. It is an infrastructure probe for Compose and load
+	// balancers rather than part of the UI's API surface, and an exact pattern still
+	// wins over the catch-all below.
 	mux.HandleFunc("GET /healthz", s.handleHealth)
+
+	// Anything under /api that matched no route above. Without this a mistyped path
+	// would fall through to the file server and answer a fetch with an HTML 404 body
+	// where the caller is expecting JSON.
+	mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusNotFound, "no such API endpoint")
+	})
+
+	// Everything else is the UI. ServeMux matches the most specific pattern, so "/"
+	// only ever sees requests no route above claimed.
+	mux.Handle("/", http.FileServer(http.Dir(s.webDir)))
+
 	return logRequests(mux)
 }
 

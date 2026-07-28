@@ -48,6 +48,12 @@ services:
     environment:
       DATABASE_URL: postgres://weaver:weaver_dev_password@postgres:5432/weaver?sslmode=disable
       API_ADDR: ":8080"
+      WEB_DIR: /web
+    # The API also serves the built UI, so the frontend has to reach it. A bind mount
+    # rather than a COPY in the image means `npm run dev` on the host is live inside
+    # the container: rebuild the bundle, refresh the browser, no image rebuild.
+    volumes:
+      - ./web:/web:ro
     ports:
       - "8080:8080"
     restart: unless-stopped

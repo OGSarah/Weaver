@@ -9,5 +9,12 @@
   "scripts": {
     "build": "esbuild src/main.jsx --bundle --outfile=dist/bundle.js",
     "dev": "esbuild src/main.jsx --bundle --outfile=dist/bundle.js --watch"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
   }
 }

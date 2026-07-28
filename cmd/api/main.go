@@ -28,6 +28,12 @@ func main() {
 	if addr == "" {
 		addr = ":8080"
 	}
+	// The built frontend is read from disk rather than embedded in the binary, so
+	// `npm run dev` rebuilds are picked up by a browser refresh with no Go rebuild.
+	webDir := os.Getenv("WEB_DIR")
+	if webDir == "" {
+		webDir = "./web"
+	}
 
 	// Cancel on Ctrl-C or SIGTERM so a shutdown drains in-flight requests instead
 	// of dropping them.
@@ -42,7 +48,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              addr,
-		Handler:           api.NewServer(st).Handler(),
+		Handler:           api.NewServer(st, webDir).Handler(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 

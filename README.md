@@ -230,7 +230,9 @@ docker compose up --scale worker=4
 
 ## Frontend
 
-The UI is a React app under `web/`, bundled with esbuild (no Vite). The Go API serves the built assets, so in production there is one origin and no CORS.
+The UI is a React app under `web/`, bundled with esbuild (no Vite). The Go API serves the built assets, so there is one origin and no CORS: API routes live under `/api`, and every other path falls through to the file server. A browser call is just `fetch('/api/workflows')`, with no host and no port.
+
+The API reads the frontend from disk rather than embedding it, so a rebuilt bundle needs only a browser refresh. It looks in `./web` by default; set `WEB_DIR` to override (Compose bind-mounts `./web` and sets it to `/web`).
 
 Install dependencies once:
 
@@ -264,13 +266,19 @@ Screenshots of the UI go here once the frontend is built (Phase 8). Drop image f
  
 ## API sketch
  
+Every API route lives under `/api`. Everything outside that prefix is the UI, served
+as static files by the same binary on the same origin.
+
 ```
-POST   /workflows              register or update a workflow definition
-GET    /workflows              list workflows
-POST   /workflows/:id/runs     trigger a run
-GET    /runs/:id               fetch run status and task states
-GET    /runs/:id/tasks/:tid    fetch a single task, including logs
-POST   /runs/:id/cancel        cancel an in-flight run
+POST   /api/workflows              register or update a workflow definition
+GET    /api/workflows              list workflows
+POST   /api/workflows/:id/runs     trigger a run
+GET    /api/runs/:id               fetch run status and task states
+GET    /api/runs/:id/tasks/:tid    fetch a single task, including logs
+POST   /api/runs/:id/cancel        cancel an in-flight run
+
+GET    /healthz                    liveness probe (not under /api: it is an
+                                   infrastructure concern, not part of the UI's API)
 ```
  
 ## Example workflow definition
@@ -294,22 +302,22 @@ With the stack up (`docker compose up --build`), the API is on `http://localhost
 
 ```bash
 # Register a workflow (returns its id and version)
-curl -s localhost:8080/workflows -d @workflow.json
+curl -s localhost:8080/api/workflows -d @workflow.json
 
 # List the current version of every workflow
-curl -s localhost:8080/workflows
+curl -s localhost:8080/api/workflows
 
 # Trigger a run of a workflow by id (returns the new run id)
-curl -s -X POST localhost:8080/workflows/<workflow-id>/runs
+curl -s -X POST localhost:8080/api/workflows/<workflow-id>/runs
 
 # Fetch a run and the state of every task in it
-curl -s localhost:8080/runs/<run-id>
+curl -s localhost:8080/api/runs/<run-id>
 
 # Fetch a single task, including its result and error
-curl -s localhost:8080/runs/<run-id>/tasks/<task-id>
+curl -s localhost:8080/api/runs/<run-id>/tasks/<task-id>
 
 # Cancel an in-flight run (stops unstarted tasks; running ones finish and are ignored)
-curl -s -X POST localhost:8080/runs/<run-id>/cancel
+curl -s -X POST localhost:8080/api/runs/<run-id>/cancel
 ```
 
 Workflows that carry a `schedule` are picked up by the scheduler, which creates a run each time a cron slot comes due. If the scheduler was down across several slots, it backfills a run for each missed slot when it returns rather than skipping them. The run for a given slot is created exactly once even if several schedulers are running: the insert is guarded by a unique index on `(workflow_id, scheduled_for)`, so the losers of the race become no-ops rather than duplicate runs.
@@ -322,6 +330,156 @@ The parts worth proving out with tests or manual chaos:
 - Trigger the same run twice and confirm idempotent handlers do not double-apply effects.
 - Force a task to fail repeatedly and confirm backoff timing, then confirm it lands in DEAD after attempts are exhausted.
 - Start many workers against a small queue and confirm no task is executed by two workers at once.
+
+## Tradeoffs and decisions
+
+Every choice below had a cheaper or more conventional alternative. These are the ones
+worth defending, and the honest cost of each.
+
+### Postgres is the queue
+
+**Instead of:** Redis, RabbitMQ, or Kafka alongside Postgres.
+
+A separate broker is the default answer for "I need a work queue", and it is faster.
+But it splits the truth in two: the broker knows what is queued, the database knows
+what is done, and nothing keeps them honest with each other. Every interesting bug in
+that design lives in the gap. Keeping the queue in the same database as the state
+means claiming a task, flipping its status, and writing its lease are one transaction
+that either all happens or none of it does.
+
+**The cost:** throughput. Polling a table will never match a purpose-built broker, and
+at high enough volume the claim query becomes a contention point. For a system whose
+entire premise is not losing work, that is the right side of the trade, but it is a
+real ceiling, not a free lunch.
+
+### `SELECT ... FOR UPDATE SKIP LOCKED` instead of a lock service
+
+Row-level locking gives mutual exclusion for free. `SKIP LOCKED` is the load-bearing
+part: without it, ten polling workers serialize behind the first one's lock and the
+pool stops being a pool. With it, each worker steps over rows that are already spoken
+for and takes the next free one, so the same table feeds many workers with no
+coordination between them.
+
+**The cost:** the guarantee is per-transaction, not per-task-forever. It stops two
+workers claiming a row *at the same moment*; it does nothing about a worker that
+claimed a row and then died. That is a separate problem, solved separately, below.
+
+### Leases and heartbeats instead of workers reporting their own death
+
+A worker that crashes cannot tell you it crashed. Any design that depends on a
+shutdown hook, a `defer`, or a goodbye message fails in exactly the case that matters:
+`kill -9`, an OOM, a yanked network cable. So workers assert liveness continuously by
+extending a lease while they work, and a reaper treats silence as death.
+
+**The cost:** a dead task is not detected instantly. It is detected one lease expiry
+later. Tuning that window is a real tradeoff: short means faster recovery but risks
+reaping a worker that was merely slow (and then the task runs twice); long means
+stranded work sits idle. There is no setting that avoids both, which is why handlers
+have to be idempotent regardless.
+
+### At-least-once, not exactly-once
+
+Exactly-once delivery is not achievable in a distributed system without cooperation
+from the thing being delivered to. A worker can finish a task and die before recording
+that it finished; the system cannot distinguish that from a worker that died mid-task.
+Weaver picks the safe interpretation and runs it again.
+
+**The cost:** it pushes the hard part onto handler authors. Every handler must be
+idempotent, and the system can only help by handing it stable run and task IDs to use
+as an idempotency key. The alternative, dropping work that might have completed, is
+worse, but this is a real constraint the API imposes on its users.
+
+### A unique index for schedule deduplication, and backfill over skip
+
+The moment there is more than one scheduler, "create a run when the schedule is due"
+becomes a distributed-systems problem. Rather than elect a leader or take an advisory
+lock, each scheduler just inserts and lets a unique index on
+`(workflow_id, scheduled_for)` decide the winner. The losers get a constraint
+violation and treat it as a no-op. The database was already the arbiter of truth, so
+it may as well arbitrate this too.
+
+Missed slots are backfilled rather than skipped: if the scheduler was down across
+three cron slots, it creates three runs when it returns. A daily report that silently
+did not run is a worse failure than one that runs late.
+
+**The cost:** backfill can produce a thundering herd after a long outage, and it
+assumes the work is still worth doing when it finally happens. A per-workflow "skip if
+older than X" policy is the obvious refinement, and it does not exist yet.
+
+### Validate at registration, not at run time
+
+The cycle check runs when a workflow is registered, so a cyclic DAG is rejected with a
+`400` before it is ever stored. JSON decoding is strict (`DisallowUnknownFields`), so a
+typo in a definition is an error rather than a silently ignored field.
+
+**The cost:** slightly more work up front, and definitions already in the database are
+trusted at run time. That is fine while registration is the only way in, but it means
+the validation is a gate rather than an invariant: anything that writes to the
+`workflows` table directly bypasses it.
+
+### Re-registering a workflow versions it rather than overwriting
+
+Registering a name that already exists stores a new version. Runs are tied to the
+version they started with, so editing a workflow cannot retroactively change the shape
+of a run that is already in flight.
+
+**The cost:** the `workflows` table grows monotonically and there is no pruning story
+yet.
+
+### The standard library's router, not a framework
+
+Go 1.22's `net/http` mux does method-and-path patterns and wildcards, which is the
+entire feature set this API needs. `chi` or `gin` would add a dependency to save
+approximately nothing.
+
+**The cost:** almost none at this size. It would start to hurt with real middleware
+chains, per-route auth, or dozens of endpoints.
+
+### esbuild, hand-configured, instead of Vite
+
+This is the one decision made for learning rather than engineering. Vite would be one
+command and zero config. Wiring esbuild by hand means the bundler is not a black box:
+it is visibly a thing that resolves imports, transforms JSX, and emits one file the
+browser can load.
+
+**The cost:** no dev server, no hot module replacement, no automatic browser refresh.
+`npm run dev` rebuilds the bundle and you refresh the page yourself. For a UI this
+size that is a fair trade; on a larger frontend it would grate quickly.
+
+### The Go API serves the frontend, under a `/api` prefix
+
+**Instead of:** running the bundler's dev server on another port and proxying, or
+enabling CORS.
+
+All API routes live under `/api`; everything else falls through to a static file
+server. One origin means no CORS preflights, no proxy config, no cookie or credential
+subtleties, and a browser `fetch('/api/workflows')` that needs no host or port. It is
+also the same arrangement in production as in development, so there is no class of bug
+that only appears in one of them.
+
+**The cost:** the API and the UI are deployed as a unit and scale together, which would
+be wrong for a larger system. The prefix also has to be kept consistent by hand, and
+requests for unknown `/api/*` paths need an explicit JSON 404 so they do not fall
+through and answer a `fetch` with an HTML error page.
+
+### The frontend is read from disk, not embedded
+
+`//go:embed` would compile the built bundle into the binary and produce a single
+self-contained artifact, genuinely the better answer for deployment. Reading from
+disk instead (via `WEB_DIR`, bind-mounted in Compose) means `npm run dev` rebuilds are
+visible on a browser refresh with no Go rebuild and no image rebuild.
+
+**The cost:** the binary is no longer self-contained; it needs `web/` next to it. This
+is the decision most likely to be worth reversing once the UI stops changing hourly.
+
+### `web/dist/bundle.js` is committed
+
+Committing build output is normally a smell. It is here so a fresh clone plus
+`docker compose up --build` produces a working UI with no Node toolchain involved.
+
+**The cost:** every frontend change produces a large, unreadable diff, and the
+committed artifact can silently drift from the source that supposedly produced it.
+Worth revisiting when the UI is real: the fix is a Node stage in the Dockerfile.
 
 ## Roadmap
  
