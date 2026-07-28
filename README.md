@@ -6,15 +6,15 @@ Currently WIP
 
 TODO: Add CI/CD with GitHub actions
 
-A DAG-based job scheduler and workflow orchestrator. Weaver lets you define workflows as directed acyclic graphs of tasks, schedule them, execute them across a pool of workers, and recover automatically when things fall. Think of it as small, readable, from-scratch take on the ideas behind Airflow and Temporal.
+A DAG-based job scheduler and workflow orchestrator. Weaver lets you define workflows as directed acyclic graphs of tasks, schedule them, execute them across a pool of workers, and recover automatically when things fail. Think of it as a small, readable, from-scratch take on the ideas behind Airflow and Temporal.
 
 ## Why this exists
 
-Weaver is built to exercise the harder, more interesting problems that show up once you taken execution reliability seriously. They are:
+Weaver is built to exercise the harder, more interesting problems that show up once you take execution reliability seriously. They are:
 
-- At-lease-once execution with idempotency, so a retried task does not corrupt state.
+- At-least-once execution with idempotency, so a retried task does not corrupt state.
 - Dead worker detection via heartbeats and lease expiry, so a crashed worker does not strand its work.
-- Dependency resolution across a DAG, so tasks only run once their upsteams succeed.
+- Dependency resolution across a DAG, so tasks only run once their upstreams succeed.
 - Retries with exponential backoff and timeouts, so transient failures self-heal.
 - A queue that survives restarts, backed by Postgres rather than in-memory state.
 
@@ -49,7 +49,7 @@ C --> A
 
 The acyclic property is what makes the whole system computable. Because there are no cycles, two things are always true:
 
-1. You an always find a valid order to run the tasks. This ordering is called a `topological sort`, and there can be more than one valid ordering. This is exactly what lets independent tasks (like "transform" and "validate" above) run in parallel.
+1. You can always find a valid order to run the tasks. This ordering is called a `topological sort`, and there can be more than one valid ordering. This is exactly what lets independent tasks (like "transform" and "validate" above) run in parallel.
 2. You can always answer "what is ready to run right now?" by checking whether every task pointing into a given task has already succeeded.
 
 The worker loop is essentially:
@@ -58,7 +58,7 @@ The worker loop is essentially:
 - Mark the tasks as complete.
 - Repeat. The algorithm only terminates because the graph is acyclic.
 
-Because of this, one of the first things Weaver does when a worklow is submitted is validate that it is actually a DAG, rejecting any definition that contains a cycle before it ever tries to run. Cycle detection is a classic depth-first-search problem.
+Because of this, one of the first things Weaver does when a workflow is submitted is validate that it is actually a DAG, rejecting any definition that contains a cycle before it ever tries to run. Cycle detection is a classic depth-first-search problem.
 
 ## Glossary
 
@@ -201,7 +201,7 @@ The backend is written in Go, split into three binaries (`cmd/api`, `cmd/schedul
 - HTTP: the standard library `net/http`, optionally with a lightweight router like `chi`. No heavy framework is needed.
 - Cron parsing: `robfig/cron` for interpreting workflow schedules.
 - Store and queue: Postgres, serving as both the durable store and the task queue.
-- Frontend: React (scaffolded with Vite) plus a DAG rendering library such as React Flow for the graph view.
+- Frontend: React, bundled with esbuild, plus a DAG rendering library such as React Flow for the graph view.
 - Local dev: Docker Compose to bring up Postgres and one or more workers.
 
 Deliberately not used: a separate message broker (Redis, RabbitMQ, Kafka) or an external lock service. Keeping the queue and locks inside Postgres is the whole point, since it gives transactional state transitions and one source of truth. Adding a broker later is a reasonable extension, not a starting requirement.
@@ -219,8 +219,7 @@ docker compose up --build
 # run database migrations
 migrate -path ./migrations -database "$DATABASE_URL" up
  
-# the UI is served at http://localhost:3000
-# the API is served at http://localhost:8080
+# the API (and the UI it serves) is available at http://localhost:8080
 ```
  
 To scale workers locally, increase the replica count:
@@ -228,6 +227,31 @@ To scale workers locally, increase the replica count:
 ```bash
 docker compose up --scale worker=4
 ```
+
+## Frontend
+
+The UI is a React app under `web/`, bundled with esbuild (no Vite). The Go API serves the built assets, so in production there is one origin and no CORS.
+
+Install dependencies once:
+
+```bash
+cd web
+npm install
+```
+
+For development, run the bundler in watch mode so it rebuilds on every save:
+
+```bash
+npm run dev
+```
+
+For a one-shot production build:
+
+```bash
+npm run build
+```
+
+Both commands bundle `src/main.jsx` (resolving imports and transforming JSX) into `dist/bundle.js`, which `index.html` loads. With the API running, the UI is served alongside it; `npm run dev` only rebuilds the bundle, so refresh the browser to see changes.
 
 ## Screenshots
  
