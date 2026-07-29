@@ -44,7 +44,7 @@ start on Node older than 20.19. The image builds the frontend bundle itself, so
 ### 1. Clone
 
 ```bash
-git clone <your-repo-url> weaver
+git clone https://github.com/OGSarah/Weaver.git
 cd weaver
 ```
 
