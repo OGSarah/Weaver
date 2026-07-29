@@ -272,6 +272,15 @@ two independent loops, the cron scheduler and the reaper
 ([`cmd/scheduler/main.go`](cmd/scheduler/main.go)), which is why both of its arrows
 start in the same box.
 
+**One replica is a deployment choice, not a constraint: both loops are safe to run
+concurrently.** The cron insert is `ON CONFLICT (workflow_id, scheduled_for) DO
+NOTHING`, so a scheduler that loses a slot creates nothing rather than erroring, and
+the reaper takes its expired leases `FOR UPDATE OF l SKIP LOCKED` and decides them in
+the same transaction, so two reapers get disjoint sets and neither can act on a task
+the other has already ruled on. A second replica buys availability, not speed: a
+stranded task still waits out its 30s lease, since expiry rather than the sweep is
+what makes it reclaimable.
+
 ### Task lifecycle
 
 Every task moves through a small, explicit state machine. Keeping the states minimal is what makes recovery tractable: a reaper only has to look for leases that expired while a task was RUNNING.
