@@ -24,21 +24,22 @@ A DAG-based job scheduler and workflow orchestrator. Weaver lets you define work
 - A React UI that renders the DAG, shows live run status, and exposes logs and run history.
 - A REST API for triggering runs, inspecting state, and managing workflow definitions.
 
-<details>
-<summary><h2>Getting started</h2></summary>
+## Getting started
 
 Everything below assumes a clean machine and a clean database, and ends with the UI
 open in a browser and real runs moving through it.
 
 ### Prerequisites
 
-- **Docker** (Docker Desktop, OrbStack, or equivalent) for Postgres and the three services.
-- **Go 1.25+** only if you want to run the binaries outside Docker. [`go.mod`](go.mod)
-  pins the exact version, and CI reads it from there rather than repeating it.
-- **Node 20.19+** only if you intend to change the frontend *and* run the API outside
-  Docker; the image and CI both build on Node 22, and ESLint 10 will refuse to start
-  on anything older. The image builds the bundle itself, so `docker compose up`
-  renders the UI on a machine with no Node installed at all.
+| Tool | Version | Needed when |
+| --- | --- | --- |
+| **Docker** | Docker Desktop, OrbStack, or equivalent | Always. Runs Postgres and the three services |
+| **Go** | 1.25+, pinned exactly by [`go.mod`](go.mod) | Only to run the binaries outside Docker |
+| **Node** | 20.19+ (the image and CI both build on 22) | Only to change the frontend *and* run the API outside Docker |
+
+CI reads the Go version from `go.mod` rather than repeating it. ESLint 10 refuses to
+start on Node older than 20.19. The image builds the frontend bundle itself, so
+`docker compose up` renders the UI on a machine with no Node installed at all.
 
 ### 1. Clone
 
@@ -151,7 +152,7 @@ curl -s -X POST localhost:8080/api/runs/<run-id>/cancel
 Anything not yet started turns to dashed `CANCELLED` outlines. The UI never learns
 about this directly; it just polls, which is the point of keeping the UI a read layer.
 
-**Kill a worker mid-task.** The Phase 6 payoff, and the most interesting thing here:
+**Kill a worker mid-task.** The most interesting thing here:
 
 ```bash
 docker compose kill --signal=SIGKILL worker
@@ -171,16 +172,13 @@ To keep the workers down while you watch, stop them instead of killing them
 (`docker compose stop worker`), then bring them back with
 `docker compose up -d --scale worker=2`.
 
-</details>
-
-<details>
-<summary><h2>Understanding DAGS</h2></summary>
+## Understanding DAGs
 
 DAG stands for Directed Acyclic Graph. It is the concept the entire project is built around, so it is worth taking the time to understand before doing anything else. Break the name into its three parts:
 
-- Graph: A set of nodes connected by edges. In Weaver, each node is a task ("extract data", "send email") and each edge is a dependency between tasks.
-- Directed: The edges have a direction. "Transform" depends on "extract", and that arrow only points one way. Extract has to finish before transform can start, never the reverse.
-- Acyclic: There are no cycles. You can never follow the arrows and end up back where you started. This is a crucial property.
+- **Graph:** A set of nodes connected by edges. In Weaver, each node is a task ("extract data", "send email") and each edge is a dependency between tasks.
+- **Directed:** The edges have a direction. "Transform" depends on "extract", and that arrow only points one way. Extract has to finish before transform can start, never the reverse.
+- **Acyclic:** There are no cycles. You can never follow the arrows and end up back where you started. This is a crucial property.
 
 A valid DAG has arrows that only ever flow forward.
 
@@ -218,45 +216,47 @@ Because of this, one of the first things Weaver does when a workflow is submitte
 
 ### Glossary
 
-- `Node` (or vertex): A single task.
-- `Edge`: A dependency arrow between two tasks.
-- `Upstream`: The tasks that must finish before a given task can run ("extract" is upstream of "transform").
-- `Downstream`: The tasks waiting on a given task to finish.
-- `Root task`: A task with no upstream dependencies. These are what the scheduler kicks off first when a run starts.
-- `Topological sort`: Any ordering of the tasks that respects all the dependency arrows.
+| Term | Meaning |
+| --- | --- |
+| `Node` (or vertex) | A single task |
+| `Edge` | A dependency arrow between two tasks |
+| `Upstream` | The tasks that must finish before a given task can run ("extract" is upstream of "transform") |
+| `Downstream` | The tasks waiting on a given task to finish |
+| `Root task` | A task with no upstream dependencies. These are what the scheduler kicks off first when a run starts |
+| `Topological sort` | Any ordering of the tasks that respects all the dependency arrows |
 
-</details>
+## Architecture
 
-<details>
-<summary><h2>Architecture</h2></summary>
+Weaver splits into four moving parts:
 
-Weaver splits into four moving parts: 
 1. An API server
 2. A Postgres-backed store that doubles as the task queue
 3. A pool of stateless workers
-4. A scheduler that turns time into work. The React UI talks only to the API server.
- 
+4. A scheduler that turns time into work
+
+The React UI talks only to the API server.
+
 ```mermaid
 graph TB
     subgraph Client
         UI[React UI]
     end
- 
+
     subgraph Control Plane
         API[API Server]
         SCH[Scheduler]
     end
- 
+
     subgraph State
         DB[(Postgres:<br/>workflows, runs, tasks,<br/>dependencies, leases, task_logs)]
     end
- 
+
     subgraph Execution
         W1[Worker 1]
         W2[Worker 2]
         W3[Worker N]
     end
- 
+
     UI -->|REST| API
     API -->|read / write| DB
     SCH -->|create runs for due cron slots| DB
@@ -271,11 +271,21 @@ the queue, and claiming is a row lock on it. The scheduler is one process runnin
 two independent loops, the cron scheduler and the reaper
 ([`cmd/scheduler/main.go`](cmd/scheduler/main.go)), which is why both of its arrows
 start in the same box.
- 
+
 ### Task lifecycle
- 
+
 Every task moves through a small, explicit state machine. Keeping the states minimal is what makes recovery tractable: a reaper only has to look for leases that expired while a task was RUNNING.
- 
+
+| State | Means | Terminal | Claimable |
+| --- | --- | --- | --- |
+| `PENDING` | Upstream tasks have not all succeeded yet | no | no |
+| `READY` | Unblocked, never attempted since | no | yes |
+| `RUNNING` | A worker holds a live lease on it | no | no |
+| `FAILED` | An attempt is behind it and another is coming | no | once `scheduled_at` passes |
+| `SUCCEEDED` | The handler returned without error | yes | — |
+| `DEAD` | Attempts are spent | yes | — |
+| `CANCELLED` | Its run stopped before it could run, or its worker died after the run had already ended | yes | — |
+
 ```mermaid
 stateDiagram-v2
     [*] --> Pending
@@ -295,7 +305,7 @@ stateDiagram-v2
     Dead --> [*]
     Cancelled --> [*]
 ```
- 
+
 Two of these states are easy to misread. **Failed is a waiting state, not a terminal
 one:** it means an attempt happened and did not finish, and another is coming. Dead
 is the terminal one, reached when the attempts are spent. Keeping them apart is what
@@ -309,7 +319,7 @@ which, with no need to read its error column to find out. The two paths into Fai
 differ only in when the next attempt may start: a handler error backs off
 exponentially, while a task reclaimed from a dead worker is claimable immediately,
 since a worker dying is no evidence the task itself needs time to settle.
- 
+
 Because Failed is a waiting state, it is *claimable*. The claim query selects on
 `status IN ('ready', 'failed') AND scheduled_at <= now()`, so a retry becomes
 eligible the moment its delay passes, with no background sweep needed to promote it
@@ -323,27 +333,27 @@ cannot be forcibly stopped; if its worker then dies, the reaper finds an expired
 lease on a task whose run is already finished. Requeuing it would resume a
 cancelled run, and Dead would report a deliberate stop as a failure, so it lands
 Cancelled instead ([`reapCancel`](internal/store/reaper.go)).
- 
+
 ### Task logs
- 
+
 A handler is given a logger alongside its context and task, and every line it writes
 lands in the `task_logs` table against the task and attempt that produced it:
- 
+
 ```go
 reg.Register("extractData", func(ctx context.Context, task store.ClaimedTask, log *worker.TaskLogger) error {
     log.Printf("fetching %d rows", n)
     return nil
 })
 ```
- 
+
 Two decisions are worth knowing about.
- 
+
 **Lines are written one at a time, as they happen,** rather than buffered and
 flushed when the task ends. That is chattier, and it is the right trade here: a
 buffered log is lost exactly when a worker is killed mid-task, which is the moment
 the log was worth keeping. It also means the UI can tail a task that is still
 running.
- 
+
 **The state transitions log themselves,** in the same transaction that performs
 them. Claiming, succeeding, failing, retrying, being reaped, and being cancelled
 each write their own line, so a task's log is a complete account of its life even if
@@ -351,16 +361,16 @@ its handler never logged anything, and a task can never be marked dead with noth
 saying why. The attempt number on each line is what keeps a retried task readable:
 the UI groups by it, so "what did attempt 2 do differently" is answerable at a
 glance.
- 
+
 ### Execution flow for a single run
- 
+
 ```mermaid
 sequenceDiagram
     participant U as User / Scheduler
     participant A as API Server
     participant D as Postgres
     participant W as Worker
- 
+
     U->>A: trigger workflow run
     A->>D: create run + task rows + edges (Pending)
     A->>D: mark root tasks Ready (same transaction)
@@ -387,77 +397,122 @@ where releasing the lease, recording the result, and promoting whatever it unblo
 all commit together or not at all. The worker never claims a second task while one
 is in flight, so the loop above is the whole of a single worker's life; parallelism
 comes from running more of them.
- 
-</details>
 
-<details>
-<summary><h2>How the hard parts work</h2></summary>
+## How the hard parts work
 
 ### At-least-once, not exactly-once
- 
+
 Weaver guarantees a task will run at least once. Exactly-once is not achievable in a distributed system without cooperation from the task itself, so tasks are expected to be idempotent. Each task execution carries a stable run ID and task ID that handlers can use as an idempotency key.
- 
+
 ### Claiming work without double execution
- 
+
 Workers claim tasks with `SELECT ... FOR UPDATE SKIP LOCKED`. This lets many workers poll the same table concurrently while guaranteeing that any given task row is handed to exactly one worker at a time. No external lock service is required.
- 
+
 ### Dead worker detection
- 
-When a worker claims a task it also writes a lease with an expiry timestamp (30s), and it renews that lease with periodic heartbeats while the task runs. If the worker crashes, the heartbeats stop and the lease expires. A reaper (run by the scheduler, sweeping every 5s) looks for RUNNING tasks whose lease has passed and decides each one's fate: back to FAILED with `scheduled_at = now()` if attempts remain, so another worker can claim it immediately; DEAD if they are spent, since a task that reliably kills whatever worker claims it must not cycle forever; CANCELLED if its run has meanwhile stopped. This is how a run resumes after a worker dies mid-task.
+
+When a worker claims a task it also writes a lease with an expiry timestamp (30s), and it renews that lease with periodic heartbeats while the task runs. If the worker crashes, the heartbeats stop and the lease expires. A reaper (run by the scheduler, sweeping every 5s) looks for RUNNING tasks whose lease has passed and decides each one's fate:
+
+| Situation | Verdict | Why |
+| --- | --- | --- |
+| Attempts remain | back to `FAILED` with `scheduled_at = now()` | Another worker can claim it immediately |
+| Attempts are spent | `DEAD` | A task that reliably kills whatever worker claims it must not cycle forever |
+| Its run has meanwhile stopped | `CANCELLED` | Requeuing would resume a cancelled run |
+
+This is how a run resumes after a worker dies mid-task.
 
 FAILED rather than READY is deliberate, and it is the same status a handler error produces: both mean "an attempt is behind this task". See [the task lifecycle](#task-lifecycle) above for why the two paths into it still differ in *when* the next attempt may start.
- 
+
 ### Retries and timeouts
- 
-Each task carries its own max attempt count (`retries` + 1) and timeout, both set per task in the workflow definition. The backoff between attempts is not per-task: it is exponential in the attempt number from a base of 1s, capped at 5 minutes, then full-jittered to a random point in the upper half of that delay ([`backoffDelay`](internal/store/completion.go)). On failure Weaver stores the resulting time in `scheduled_at`, and the task is not claimable until it passes. A task that exceeds its timeout is treated as a failure and follows the same path.
- 
-</details>
 
-<details>
-<summary><h2>Data model</h2></summary>
+Each task carries its own max attempt count (`retries` + 1) and timeout, both set per task in the workflow definition. The backoff between attempts is not per-task: it is exponential in the attempt number from a base of 1s, capped at 5 minutes, then full-jittered to a random point in the upper half of that delay ([`backoffDelay`](internal/store/completion.go)).
 
-The core tables (simplified):
- 
-- `workflows`: The DAG definition, versioned, stored as task nodes and edges.
-- `runs`: One row per triggered execution of a workflow.
-- `tasks`: One row per task per run, holding state, attempt count, timings, and result.
-- `dependencies`: Upstream and downstream edges for tasks within a run.
-- `leases`: worker ID, task ID, and expiry for in-flight work. The task ID is the
-  primary key, so a second lease on one task is structurally impossible.
-- `task_logs`: one row per log line, tagged with the task and the attempt that
-  wrote it.
+| After attempt | Base delay | Actual delay after jitter |
+| --- | --- | --- |
+| 1 | 1s | 0.5s – 1s |
+| 2 | 2s | 1s – 2s |
+| 3 | 4s | 2s – 4s |
+| 4 | 8s | 4s – 8s |
+| 10 and beyond | 5m (capped) | 2m30s – 5m |
+
+On failure Weaver stores the resulting time in `scheduled_at`, and the task is not claimable until it passes. A task that exceeds its timeout is treated as a failure and follows the same path.
+
+## Data model
+
+```mermaid
+erDiagram
+    workflows ||--o{ runs : "triggered as"
+    runs      ||--o{ tasks : "expands into"
+    tasks     ||--o{ dependencies : "upstream of"
+    tasks     ||--o| leases : "claimed under"
+    tasks     ||--o{ task_logs : "writes"
+
+    workflows {
+        uuid id PK
+        text name
+        int version
+        jsonb definition "nodes and edges"
+    }
+    runs {
+        uuid id PK
+        uuid workflow_id FK
+        text status
+        timestamptz scheduled_for "unique with workflow_id"
+    }
+    tasks {
+        uuid id PK
+        uuid run_id FK
+        text status
+        int attempt
+        timestamptz scheduled_at "when it becomes claimable"
+    }
+    dependencies {
+        uuid upstream_task_id FK
+        uuid downstream_task_id FK
+    }
+    leases {
+        uuid task_id PK
+        text worker_id
+        timestamptz expires_at
+    }
+    task_logs {
+        uuid task_id FK
+        int attempt
+        text line
+    }
+```
+
+Simplified, but the shapes are the point:
+
+- `workflows` are versioned, so registering an existing name stores a new version rather than overwriting one, and old runs still point at the definition they ran.
+- `dependencies` are per run, not per workflow definition, so the edges a run executed are preserved even if the workflow is later redefined.
+- `leases` has the task ID as its **primary key**, so a second lease on one task is structurally impossible rather than merely unlikely.
+- `task_logs` carries the attempt number, which is what lets the UI group a retried task's log by attempt.
+- The unique index on `runs (workflow_id, scheduled_for)` is what makes a cron slot produce exactly one run even with several schedulers racing.
+
+Everything hangs off `runs` by foreign key with cascading deletes, so removing a run takes its tasks, edges, leases, and logs with it.
 
 Keeping the queue inside Postgres (rather than a separate broker) means one source of truth, transactional state transitions, and easy recovery. It trades some raw throughput for a much simpler correctness story, which is the right call for a system whose whole point is reliability.
- 
-</details>
 
-<details>
-<summary><h2>Tech stack</h2></summary>
+## Tech stack
 
 The backend is written in Go, split into three binaries (`cmd/api`, `cmd/scheduler`, `cmd/worker`) that share one database. Go is a natural fit here: goroutines make the worker pool and heartbeat loops cheap and easy to reason about, and each binary compiles to a single static file that is trivial to run and deploy.
- 
-- Language: Go, at the version [`go.mod`](go.mod) pins (1.25.6 at the time of writing).
-- Postgres driver: `pgx` (`github.com/jackc/pgx/v5`), which exposes the row-level locking and `SELECT ... FOR UPDATE SKIP LOCKED` behavior the queue relies on.
-- Migrations: `golang-migrate` for versioned schema changes.
-- HTTP: the standard library `net/http` and nothing else. Go 1.22's method-and-path
-  patterns (`mux.HandleFunc("GET /api/runs/{id}", ...)`) cover everything the API
-  needs, so there is no third-party router to justify.
-- Cron parsing: `robfig/cron/v3` for interpreting workflow schedules, with the standard 5-field parser.
-- Goroutine lifecycles: `golang.org/x/sync/errgroup`, to run the scheduler's two loops under one context.
-- Store and queue: Postgres, serving as both the durable store and the task queue.
-- Frontend: React, bundled with esbuild. The graph is drawn by hand as SVG
-  ([`Dag.jsx`](web/src/Dag.jsx)); the only graph dependency is `@dagrejs/dagre`,
-  which does layout and no rendering, so it hands back coordinates rather than
-  components. A full node-graph library like React Flow would bring an interaction
-  model this view has no use for.
-- Local dev: Docker Compose to bring up Postgres and one or more workers.
+
+| Concern | Choice | Why |
+| --- | --- | --- |
+| Language | Go, at the version [`go.mod`](go.mod) pins (1.25.6 at the time of writing) | Cheap goroutines for the worker pool and heartbeat loops; single static binaries |
+| Postgres driver | `pgx` (`github.com/jackc/pgx/v5`) | Exposes the row-level locking and `SELECT ... FOR UPDATE SKIP LOCKED` the queue relies on |
+| Migrations | `golang-migrate` | Versioned schema changes |
+| HTTP | standard library `net/http`, nothing else | Go 1.22's method-and-path patterns (`mux.HandleFunc("GET /api/runs/{id}", ...)`) cover everything the API needs, so there is no third-party router to justify |
+| Cron parsing | `robfig/cron/v3` | Interprets workflow schedules with the standard 5-field parser |
+| Goroutine lifecycles | `golang.org/x/sync/errgroup` | Runs the scheduler's two loops under one context |
+| Store and queue | Postgres | Serves as both the durable store and the task queue |
+| Frontend | React, bundled with esbuild | See [Frontend development](#frontend-development) |
+| Graph layout | `@dagrejs/dagre` | Layout and no rendering, so it hands back coordinates rather than components. The SVG is drawn by hand in [`Dag.jsx`](web/src/Dag.jsx); a full node-graph library like React Flow would bring an interaction model this view has no use for |
+| Local dev | Docker Compose | Brings up Postgres and one or more workers |
 
 Deliberately not used: a separate message broker (Redis, RabbitMQ, Kafka) or an external lock service. Keeping the queue and locks inside Postgres is the whole point, since it gives transactional state transitions and one source of truth. Adding a broker later is a reasonable extension, not a starting requirement.
 
-</details>
-
-<details>
-<summary><h2>Frontend development</h2></summary>
+## Frontend development
 
 Skip this unless you are changing the UI. The Docker image builds the bundle itself,
 so the steps above never need npm.
@@ -505,10 +560,7 @@ Colors and spacing come from `web/src/theme.js`, and the task state palette from
 `web/src/status.js`. Those two files are the whole design system; components import
 from them rather than writing literal colors.
 
-</details>
-
-<details>
-<summary><h2>Running without Docker</h2></summary>
+## Running without Docker
 
 Useful when iterating on Go code, since it skips an image rebuild each time, and the
 only sensible way to work on the frontend.
@@ -562,32 +614,22 @@ To see what that would remove first, swap both statements for
 Task rows, edges, leases, and logs are removed with their runs by the schema's
 cascades, so the two statements above are the whole cleanup.
 
-</details>
-
-<details>
-<summary><h2>API sketch</h2></summary>
+## API sketch
 
 Every API route lives under `/api`. Everything outside that prefix is the UI, served
 as static files by the same binary on the same origin.
 
-```
-POST   /api/workflows              register or update a workflow definition
-GET    /api/workflows              list workflows (metadata only, no task lists)
-GET    /api/workflows/:id          fetch one workflow with its full task list,
-                                   including the dependency edges the UI draws
-POST   /api/workflows/:id/runs     trigger a run
-GET    /api/workflows/:id/runs     run history, newest first (?limit=N).
-                                   Covers every version of the workflow's name,
-                                   not just the version in the path
-GET    /api/runs/:id               fetch run status, task states, and the
-                                   dependency edges between them
-GET    /api/runs/:id/tasks/:tid    fetch a single task: timings, result payload,
-                                   and its log lines
-POST   /api/runs/:id/cancel        cancel an in-flight run
-
-GET    /healthz                    liveness probe (not under /api: it is an
-                                   infrastructure concern, not part of the UI's API)
-```
+| Method | Route | Does |
+| --- | --- | --- |
+| `POST` | `/api/workflows` | Register or update a workflow definition |
+| `GET` | `/api/workflows` | List workflows (metadata only, no task lists) |
+| `GET` | `/api/workflows/:id` | Fetch one workflow with its full task list, including the dependency edges the UI draws |
+| `POST` | `/api/workflows/:id/runs` | Trigger a run |
+| `GET` | `/api/workflows/:id/runs` | Run history, newest first (`?limit=N`). Covers every version of the workflow's name, not just the version in the path |
+| `GET` | `/api/runs/:id` | Fetch run status, task states, and the dependency edges between them |
+| `GET` | `/api/runs/:id/tasks/:tid` | Fetch a single task: timings, result payload, and its log lines |
+| `POST` | `/api/runs/:id/cancel` | Cancel an in-flight run |
+| `GET` | `/healthz` | Liveness probe. Not under `/api`: it is an infrastructure concern, not part of the UI's API |
 
 ### Example workflow definition
 
@@ -604,10 +646,7 @@ GET    /healthz                    liveness probe (not under /api: it is an
 }
 ```
 
-</details>
-
-<details>
-<summary><h2>Trying the API</h2></summary>
+## Trying the API
 
 With the stack up (`docker compose up --build`), the API is on `http://localhost:8080`. A definition is validated on registration: a cyclic DAG, an edge to an unknown task, or an unparseable schedule is rejected with a `400` before anything is stored. Registering a name that already exists stores a new version rather than overwriting it.
 
@@ -636,19 +675,14 @@ curl -s -X POST localhost:8080/api/runs/<run-id>/cancel
 
 Workflows that carry a `schedule` (standard 5-field cron) are picked up by the scheduler, which ticks every 10 seconds and creates a run for each slot that has come due since the last run it made for that workflow. If the scheduler was down across several slots, it backfills a run for each missed slot when it returns rather than skipping to the latest, up to 1000 slots per workflow per tick, with the remainder picked up on the following ticks. The run for a given slot is created exactly once even if several schedulers are running: the insert is guarded by a unique index on `(workflow_id, scheduled_for)`, so the losers of the race become no-ops rather than duplicate runs.
 
-</details>
-
-<details>
-<summary><h2>Testing</h2></summary>
+## Testing
 
 ```bash
-
 make test-db     # create weaver_test and apply the migrations (once, and after adding one)
 make test        # everything, including the tests that need Postgres
 make test-unit   # skips the database-backed tests, provided DATABASE_URL is unset
 make lint        # gofmt, go vet, eslint (warnings fail, same as CI)
 cd web && npm test
-
 ```
 
 `make test` points the database-backed tests at `weaver_test`, not the `weaver`
@@ -691,9 +725,9 @@ remembers to pass.
 **Integration tests are the point here, not a supplement.** Almost everything this
 project claims is a property of a transaction -- a claim that cannot double-issue,
 a completion that unblocks downstream work atomically, a reaper deciding a task's
-fate. Those are only true against a real Postgres, so CI runs one as a service
-container and applies the migrations before the suite, rather than skipping every
-test that matters.
+fate. Those are only true against a real Postgres instance, so CI runs one as a
+service container and applies the migrations before the suite, rather than skipping
+every test that matters.
 
 ### Linting
 
@@ -706,8 +740,6 @@ test that matters.
 CI runs the four workflows behind the badges at the top: Go tests (with a Postgres
 service), Go lint, web tests, and web lint. Every one of them is a command above,
 so a green badge means the same thing locally and on a branch.
-
-</details>
 
 ## License
 
