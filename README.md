@@ -414,9 +414,9 @@ When a worker claims a task it also writes a lease with an expiry timestamp (30s
 
 | Situation | Verdict | Why |
 | --- | --- | --- |
-| Attempts remain | back to `FAILED` with `scheduled_at = now()` | Another worker can claim it immediately |
-| Attempts are spent | `DEAD` | A task that reliably kills whatever worker claims it must not cycle forever |
-| Its run has meanwhile stopped | `CANCELLED` | Requeuing would resume a cancelled run |
+| Its run has meanwhile stopped (checked first) | `CANCELLED` | Requeuing would resume a cancelled run |
+| The run is live and attempts remain | back to `FAILED` with `scheduled_at = now()` | Another worker can claim it immediately |
+| The run is live and attempts are spent | `DEAD` | A task that reliably kills whatever worker claims it must not cycle forever |
 
 This is how a run resumes after a worker dies mid-task.
 
@@ -466,6 +466,7 @@ erDiagram
         timestamptz scheduled_at "when it becomes claimable"
     }
     dependencies {
+        uuid run_id FK
         uuid upstream_task_id FK
         uuid downstream_task_id FK
     }
@@ -475,9 +476,11 @@ erDiagram
         timestamptz expires_at
     }
     task_logs {
+        bigserial id PK
         uuid task_id FK
         int attempt
-        text line
+        text level "info or error"
+        text message
     }
 ```
 
