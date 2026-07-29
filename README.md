@@ -19,7 +19,7 @@ A DAG-based job scheduler and workflow orchestrator. Weaver lets you define work
 - Defines workflows as DAGs in JSON or via the API, with per-task dependencies.
 - Cron-style scheduling plus manual and API-triggered runs.
 - A worker pool that claims tasks using row-level locking (no double execution).
-- Configurable retries, backoff, and per-task timeouts.
+- Configurable retries and per-task timeouts, with exponential backoff and jitter between attempts.
 - Automatic recovery of tasks orphaned by dead workers.
 - A React UI that renders the DAG, shows live run status, and exposes logs and run history.
 - A REST API for triggering runs, inspecting state, and managing workflow definitions.
@@ -33,11 +33,12 @@ open in a browser and real runs moving through it.
 ### Prerequisites
 
 - **Docker** (Docker Desktop, OrbStack, or equivalent) for Postgres and the three services.
-- **Go 1.22+** only if you want to run the binaries outside Docker. The routing uses
-  the standard library's method-and-path patterns, which landed in 1.22.
-- **Node 18+** only if you intend to change the frontend *and* run the API outside
-  Docker. The image builds the bundle itself, so `docker compose up` renders the UI
-  on a machine with no Node installed at all.
+- **Go 1.25+** only if you want to run the binaries outside Docker. [`go.mod`](go.mod)
+  pins the exact version, and CI reads it from there rather than repeating it.
+- **Node 20.19+** only if you intend to change the frontend *and* run the API outside
+  Docker; the image and CI both build on Node 22, and ESLint 10 will refuse to start
+  on anything older. The image builds the bundle itself, so `docker compose up`
+  renders the UI on a machine with no Node installed at all.
 
 ### 1. Clone
 
@@ -157,10 +158,18 @@ docker compose kill --signal=SIGKILL worker
 ```
 
 `SIGKILL` gives the worker no chance to release its lease. Its task sits in `RUNNING`
-until the lease expires (30s), the reaper notices, and the task goes back to `FAILED`
-with `worker lease expired; requeued by reaper` in its log. Bring workers back with
-`docker compose up -d --scale worker=2` and another one finishes it, on the next
-attempt number. Nothing is lost and nothing runs twice.
+until the lease expires (30s), the reaper notices within its next 5s sweep, and the
+task goes back to `FAILED`, carrying `worker lease expired; requeued by reaper` as
+its error and a log line recording that the attempt was abandoned. A worker then
+picks it up on the next attempt number and finishes it. Nothing is lost and nothing
+runs twice.
+
+The worker service is `restart: unless-stopped`, so the container you killed comes
+back on its own within a second or two. It is a fresh process with no memory of the
+task it was running, and it competes for the requeued task exactly like its sibling.
+To keep the workers down while you watch, stop them instead of killing them
+(`docker compose stop worker`), then bring them back with
+`docker compose up -d --scale worker=2`.
 
 </details>
 
@@ -239,7 +248,7 @@ graph TB
     end
  
     subgraph State
-        DB[(Postgres:<br/>workflows, runs,<br/>tasks, queue, leases)]
+        DB[(Postgres:<br/>workflows, runs, tasks,<br/>dependencies, leases, task_logs)]
     end
  
     subgraph Execution
@@ -250,12 +259,18 @@ graph TB
  
     UI -->|REST| API
     API -->|read / write| DB
-    SCH -->|enqueue due runs| DB
+    SCH -->|create runs for due cron slots| DB
     W1 -->|claim / heartbeat / complete| DB
     W2 -->|claim / heartbeat / complete| DB
     W3 -->|claim / heartbeat / complete| DB
     SCH -->|reap expired leases| DB
 ```
+
+There is no queue table in that list because there is no queue table: `tasks` *is*
+the queue, and claiming is a row lock on it. The scheduler is one process running
+two independent loops, the cron scheduler and the reaper
+([`cmd/scheduler/main.go`](cmd/scheduler/main.go)), which is why both of its arrows
+start in the same box.
  
 ### Task lifecycle
  
@@ -275,6 +290,7 @@ stateDiagram-v2
     Pending --> Cancelled: run cancelled
     Ready --> Cancelled: run cancelled
     Failed --> Cancelled: run cancelled
+    Running --> Cancelled: lease expired, run no longer active
     Succeeded --> [*]
     Dead --> [*]
     Cancelled --> [*]
@@ -300,6 +316,13 @@ eligible the moment its delay passes, with no background sweep needed to promote
 back to Ready. It also means cancelling a run has to cancel Failed tasks alongside
 Pending and Ready ones, or a cancelled run would still have work picked up when its
 backoff elapsed.
+
+The one edge into Cancelled that does not come from a cancel request is
+Running -> Cancelled. A running task is left alone by a cancel, because a handler
+cannot be forcibly stopped; if its worker then dies, the reaper finds an expired
+lease on a task whose run is already finished. Requeuing it would resume a
+cancelled run, and Dead would report a deliberate stop as a failure, so it lands
+Cancelled instead ([`reapCancel`](internal/store/reaper.go)).
  
 ### Task logs
  
@@ -339,22 +362,31 @@ sequenceDiagram
     participant W as Worker
  
     U->>A: trigger workflow run
-    A->>D: create run + task rows (Pending)
-    A->>D: mark root tasks Ready
+    A->>D: create run + task rows + edges (Pending)
+    A->>D: mark root tasks Ready (same transaction)
     loop poll for work
-        W->>D: claim a Ready task (SELECT ... FOR UPDATE SKIP LOCKED)
+        W->>D: claim a due Ready or Failed task (SELECT ... FOR UPDATE SKIP LOCKED)
         D-->>W: task + lease (Running)
         loop while executing
             W->>D: heartbeat (extend lease)
         end
         alt success
-            W->>D: mark Succeeded
-            W->>D: mark newly unblocked tasks Ready
-        else failure
-            W->>D: mark Failed (schedule retry or Dead)
+            W->>D: release lease, mark Succeeded, unblock downstream tasks
+        else failure, attempts remaining
+            W->>D: release lease, mark Failed with a backoff delay
+        else failure, attempts exhausted
+            W->>D: release lease, mark Dead, fail the run
         end
     end
 ```
+
+The writes group into transactions rather than happening one arrow at a time.
+Creating the run and marking its roots Ready is one; so is the claim, which flips
+the task to Running and writes its lease together; and so is each outcome branch,
+where releasing the lease, recording the result, and promoting whatever it unblocked
+all commit together or not at all. The worker never claims a second task while one
+is in flight, so the loop above is the whole of a single worker's life; parallelism
+comes from running more of them.
  
 </details>
 
@@ -371,11 +403,13 @@ Workers claim tasks with `SELECT ... FOR UPDATE SKIP LOCKED`. This lets many wor
  
 ### Dead worker detection
  
-When a worker claims a task it also writes a lease with an expiry timestamp, and it renews that lease with periodic heartbeats while the task runs. If the worker crashes, the heartbeats stop and the lease expires. A reaper (run by the scheduler) sweeps for RUNNING tasks whose lease has passed, and returns them to READY so another worker can pick them up. This is how a run resumes after a worker dies mid-task.
+When a worker claims a task it also writes a lease with an expiry timestamp (30s), and it renews that lease with periodic heartbeats while the task runs. If the worker crashes, the heartbeats stop and the lease expires. A reaper (run by the scheduler, sweeping every 5s) looks for RUNNING tasks whose lease has passed and decides each one's fate: back to FAILED with `scheduled_at = now()` if attempts remain, so another worker can claim it immediately; DEAD if they are spent, since a task that reliably kills whatever worker claims it must not cycle forever; CANCELLED if its run has meanwhile stopped. This is how a run resumes after a worker dies mid-task.
+
+FAILED rather than READY is deliberate, and it is the same status a handler error produces: both mean "an attempt is behind this task". See [the task lifecycle](#task-lifecycle) above for why the two paths into it still differ in *when* the next attempt may start.
  
 ### Retries and timeouts
  
-Each task has a max attempt count and a base backoff. On failure, Weaver computes the next eligible run time using exponential backoff with jitter, and the task will not be claimable again until that time passes. A task that exceeds its timeout is treated as a failure and follows the same path.
+Each task carries its own max attempt count (`retries` + 1) and timeout, both set per task in the workflow definition. The backoff between attempts is not per-task: it is exponential in the attempt number from a base of 1s, capped at 5 minutes, then full-jittered to a random point in the upper half of that delay ([`backoffDelay`](internal/store/completion.go)). On failure Weaver stores the resulting time in `scheduled_at`, and the task is not claimable until it passes. A task that exceeds its timeout is treated as a failure and follows the same path.
  
 </details>
 
@@ -388,7 +422,10 @@ The core tables (simplified):
 - `runs`: One row per triggered execution of a workflow.
 - `tasks`: One row per task per run, holding state, attempt count, timings, and result.
 - `dependencies`: Upstream and downstream edges for tasks within a run.
-- `leases`: worker ID, task ID, and expiry for in-flight work
+- `leases`: worker ID, task ID, and expiry for in-flight work. The task ID is the
+  primary key, so a second lease on one task is structurally impossible.
+- `task_logs`: one row per log line, tagged with the task and the attempt that
+  wrote it.
 
 Keeping the queue inside Postgres (rather than a separate broker) means one source of truth, transactional state transitions, and easy recovery. It trades some raw throughput for a much simpler correctness story, which is the right call for a system whose whole point is reliability.
  
@@ -399,13 +436,20 @@ Keeping the queue inside Postgres (rather than a separate broker) means one sour
 
 The backend is written in Go, split into three binaries (`cmd/api`, `cmd/scheduler`, `cmd/worker`) that share one database. Go is a natural fit here: goroutines make the worker pool and heartbeat loops cheap and easy to reason about, and each binary compiles to a single static file that is trivial to run and deploy.
  
-- Language: Go (1.22 or newer).
-- Postgres driver: `pgx` (`github.com/jackc/pgx`), which exposes the row-level locking and `SELECT ... FOR UPDATE SKIP LOCKED` behavior the queue relies on.
+- Language: Go, at the version [`go.mod`](go.mod) pins (1.25.6 at the time of writing).
+- Postgres driver: `pgx` (`github.com/jackc/pgx/v5`), which exposes the row-level locking and `SELECT ... FOR UPDATE SKIP LOCKED` behavior the queue relies on.
 - Migrations: `golang-migrate` for versioned schema changes.
-- HTTP: the standard library `net/http`, optionally with a lightweight router like `chi`. No heavy framework is needed.
-- Cron parsing: `robfig/cron` for interpreting workflow schedules.
+- HTTP: the standard library `net/http` and nothing else. Go 1.22's method-and-path
+  patterns (`mux.HandleFunc("GET /api/runs/{id}", ...)`) cover everything the API
+  needs, so there is no third-party router to justify.
+- Cron parsing: `robfig/cron/v3` for interpreting workflow schedules, with the standard 5-field parser.
+- Goroutine lifecycles: `golang.org/x/sync/errgroup`, to run the scheduler's two loops under one context.
 - Store and queue: Postgres, serving as both the durable store and the task queue.
-- Frontend: React, bundled with esbuild, plus a DAG rendering library such as React Flow for the graph view.
+- Frontend: React, bundled with esbuild. The graph is drawn by hand as SVG
+  ([`Dag.jsx`](web/src/Dag.jsx)); the only graph dependency is `@dagrejs/dagre`,
+  which does layout and no rendering, so it hands back coordinates rather than
+  components. A full node-graph library like React Flow would bring an interaction
+  model this view has no use for.
 - Local dev: Docker Compose to bring up Postgres and one or more workers.
 
 Deliberately not used: a separate message broker (Redis, RabbitMQ, Kafka) or an external lock service. Keeping the queue and locks inside Postgres is the whole point, since it gives transactional state transitions and one source of truth. Adding a broker later is a reasonable extension, not a starting requirement.
@@ -439,7 +483,7 @@ npm install     # once
 npm run dev     # rebuild on every save
 npm run build   # one-shot build
 npm test        # unit tests for the pure modules (node --test)
-npm run lint    # eslint, the same check CI runs
+npm run lint    # eslint; CI and `make lint` add --max-warnings=0
 ```
 
 `npm run dev` writes straight into `web/dist/`, which is where the host API is already
@@ -494,15 +538,29 @@ does this for you, so the CLI is only needed here.
 
 ### If the workflow list looks cluttered
 
-The integration tests register throwaway workflows and leave them behind. To clear
-them out:
+`cmd/worker -seed` leaves a `demo-<timestamp>` workflow behind every time it runs,
+and the integration tests leave a pile of throwaway definitions behind if they were
+ever pointed at this database rather than `weaver_test` (`make test` points them at
+`weaver_test`; `make test-unit` uses whatever `DATABASE_URL` your shell exports,
+which the steps above set to `weaver`).
+
+The test fixtures do not share one prefix (they run to `diamond-`, `retry-`,
+`history-`, `reap-requeue-`, `heartbeat-`, `sched-`, `logs-` and more), so the
+cleanup is easiest as a keep-list. Everything not named below is deleted, so put
+your own workflow names in the list before running it:
 
 ```bash
 docker compose exec postgres psql -U weaver -d weaver -c "
 DELETE FROM runs WHERE workflow_id IN (
-  SELECT id FROM workflows WHERE name LIKE 'claim-test-%' OR name LIKE 'demo-%');
-DELETE FROM workflows WHERE name LIKE 'claim-test-%' OR name LIKE 'demo-%';"
+  SELECT id FROM workflows WHERE name NOT IN ('etl-pipeline', 'flaky-pipeline'));
+DELETE FROM workflows WHERE name NOT IN ('etl-pipeline', 'flaky-pipeline');"
 ```
+
+To see what that would remove first, swap both statements for
+`SELECT name, version FROM workflows WHERE name NOT IN (...)`.
+
+Task rows, edges, leases, and logs are removed with their runs by the schema's
+cascades, so the two statements above are the whole cleanup.
 
 </details>
 
@@ -576,7 +634,7 @@ curl -s localhost:8080/api/runs/<run-id>/tasks/<task-id>
 curl -s -X POST localhost:8080/api/runs/<run-id>/cancel
 ```
 
-Workflows that carry a `schedule` are picked up by the scheduler, which creates a run each time a cron slot comes due. If the scheduler was down across several slots, it backfills a run for each missed slot when it returns rather than skipping them. The run for a given slot is created exactly once even if several schedulers are running: the insert is guarded by a unique index on `(workflow_id, scheduled_for)`, so the losers of the race become no-ops rather than duplicate runs.
+Workflows that carry a `schedule` (standard 5-field cron) are picked up by the scheduler, which ticks every 10 seconds and creates a run for each slot that has come due since the last run it made for that workflow. If the scheduler was down across several slots, it backfills a run for each missed slot when it returns rather than skipping to the latest, up to 1000 slots per workflow per tick, with the remainder picked up on the following ticks. The run for a given slot is created exactly once even if several schedulers are running: the insert is guarded by a unique index on `(workflow_id, scheduled_for)`, so the losers of the race become no-ops rather than duplicate runs.
 
 </details>
 
@@ -587,15 +645,22 @@ Workflows that carry a `schedule` are picked up by the scheduler, which creates 
 
 make test-db     # create weaver_test and apply the migrations (once, and after adding one)
 make test        # everything, including the tests that need Postgres
-make test-unit   # only the tests that need nothing; the rest skip themselves
-make lint        # gofmt, go vet, eslint
+make test-unit   # skips the database-backed tests, provided DATABASE_URL is unset
+make lint        # gofmt, go vet, eslint (warnings fail, same as CI)
 cd web && npm test
 
 ```
 
-The tests that touch a database point at `weaver_test`, not the `weaver` database
-Compose uses. They share a queue with whatever else is running against the same
-database, and the workers in Compose would claim the tasks a test just created.
+`make test` points the database-backed tests at `weaver_test`, not the `weaver`
+database Compose uses. They share a queue with whatever else is running against the
+same database, and the workers in Compose would claim the tasks a test just created.
+
+`make test-unit` gets its skipping for free: a test that needs Postgres skips itself
+when `DATABASE_URL` is unset, and the target does not set one. It does not *unset*
+one either, so in a shell where you exported `DATABASE_URL` by hand (as [Running
+without Docker](#running-without-docker) does) it is not a unit-only run at all --
+it runs the full suite against whatever that URL points at. Use `env -u DATABASE_URL
+make test-unit` if you want the guarantee rather than the convention.
 
 ### What each suite covers
 
